@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="he">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>Login</title>
+</head>
+<body>
+  <main class="card">
+    <h1>התחברות</h1>
+
+    <form id="loginForm">
+      <label>Username</label>
+      <input id="username" required />
+
+      <label>Password</label>
+      <input id="password" type="password" required />
+
+      <p id="error" class="error" hidden>Invalid credentials</p>
+
+      <button type="submit">Login</button>
+    </form>
+  </main>
+
+  <script>
+    // Demo users (ללא שרת כרגע)
+    const USERS = {
+      student1: { password: "1234", role: "student" },
+      instructor1: { password: "1234", role: "instructor" }
+    };
+
+    document.getElementById("loginForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const u = document.getElementById("username").value.trim();
+      const p = document.getElementById("password").value;
+
+      const user = USERS[u];
+      const ok = user && user.password === p;
+
+      const err = document.getElementById("error");
+      if (!ok) {
+        err.hidden = false;
+        return;
+      }
+      err.hidden = true;
+
+      // "Authentication state"
+      localStorage.setItem("isLoggedIn", "true");
+      localStorage.setItem("username", u);
+      localStorage.setItem("role", user.role);
+
+      window.location.href = "dashboard.html";
+    });
+  </script>
+</body>
+</html>
