@@ -62,10 +62,14 @@ def register(body: RegisterBody):
 @app.post("/auth/login")
 def login(body: LoginBody):
     user = db.get_user_by_username(body.username)
-    if not user or not verify_password(body.password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid username or password")
 
-    # role comes from account/profile data (DB)
+    # ✅ Invalid credentials -> error message
+    if not user or not verify_password(body.password, user["password_hash"]):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid credentials. Please check your username and password."
+        )
+
     token = create_access_token(username=user["username"], role=user["role"])
     return {"access_token": token, "token_type": "bearer", "role": user["role"]}
 
@@ -75,6 +79,7 @@ def me(user=Depends(get_current_user)):
     return user
 
 
+# Example protected pages/features:
 @app.get("/student/results")
 def student_results(user=Depends(require_roles("student"))):
     return {"page": "Student Peer Review Results", "user": user}
