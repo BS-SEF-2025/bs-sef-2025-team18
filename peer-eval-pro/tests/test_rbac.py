@@ -29,3 +29,16 @@ def test_instructor_can_access_instructor_page():
 
     res = client.get("/instructor/publish", headers={"Authorization": f"Bearer {token}"})
     assert res.status_code == 200
+
+
+def test_login_invalid_username_shows_error_message():
+    res = client.post("/auth/login", json={"username": "no_user", "password": "1234"})
+    assert res.status_code == 401
+    assert res.json()["detail"] == "Invalid credentials. Please check your username and password."
+
+
+def test_login_invalid_password_shows_error_message():
+    client.post("/auth/register", json={"username": "s2", "password": "1234", "role": "student"})
+    res = client.post("/auth/login", json={"username": "s2", "password": "wrong"})
+    assert res.status_code == 401
+    assert res.json()["detail"] == "Invalid credentials. Please check your username and password."
