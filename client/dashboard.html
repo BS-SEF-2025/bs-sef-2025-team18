@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="he">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>Dashboard</title>
+
+  <!-- MUST: protects the page -->
+  <script src="protected.js"></script>
+</head>
+<body>
+  <main class="card">
+    <h1>Dashboard</h1>
+    <p id="who"></p>
+    <button id="logout">Logout</button>
+  </main>
+
+  <script>
+    const username = localStorage.getItem("username") || "unknown";
+    const role = localStorage.getItem("role") || "unknown";
+    document.getElementById("who").textContent = `Hello ${username} (${role})`;
+
+    document.getElementById("logout").addEventListener("click", () => {
+      localStorage.removeItem("isLoggedIn");
+      localStorage.removeItem("username");
+      localStorage.removeItem("role");
+      window.location.href = "login.html";
+    });
+  </script>
+</body>
+</html>
