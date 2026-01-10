@@ -1,16 +1,21 @@
 from fastapi.testclient import TestClient
 import os
-import db
-from main import app
+from backend import db
+from backend.main import app
+
+
 
 client = TestClient(app)
 
 
 def setup_module():
-    # fresh db per test run
-    if os.path.exists("app.db"):
-        os.remove("app.db")
+    db_path = os.path.join("backend", "app.db")
+
+    if os.path.exists(db_path):
+        os.remove(db_path)
+
     db.init_db()
+
 
 
 def test_student_cannot_access_instructor_page():
@@ -42,3 +47,11 @@ def test_login_invalid_password_shows_error_message():
     res = client.post("/auth/login", json={"username": "s2", "password": "wrong"})
     assert res.status_code == 401
     assert res.json()["detail"] == "Invalid credentials. Please check your username and password."
+if __name__ == "__main__":
+    setup_module()
+    test_student_cannot_access_instructor_page()
+    test_instructor_can_access_instructor_page()
+    test_login_invalid_username_shows_error_message()
+    test_login_invalid_password_shows_error_message()
+    print("All tests passed ✅")
+

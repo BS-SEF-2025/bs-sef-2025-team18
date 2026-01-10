@@ -2,9 +2,10 @@ from fastapi import FastAPI, Depends, HTTPException, Header
 from pydantic import BaseModel
 from typing import Optional, Callable
 
-import db
-from security import hash_password, verify_password
-from token_service import create_access_token, decode_access_token
+from . import db
+from .security import hash_password, verify_password
+from .token_service import create_access_token, decode_access_token
+
 
 app = FastAPI(title="PeerEval Pro - Role Based Access")
 

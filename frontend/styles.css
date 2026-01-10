@@ -1,5 +1,5 @@
-body { font-family: Arial, sans-serif; background:#a1ac9a; color:#eee; margin:0; }
-.card { max-width:360px; margin:60px auto; padding:20px; background:#1c1c1c; border-radius:12px; }
+body { font-family: Arial, sans-serif; background:#222163b7; color:#eee; margin:0; }
+.card { max-width:360px; margin:60px auto; padding:20px; background:#501f1f; border-radius:12px; }
 input, button { width:100%; padding:10px; margin:8px 0; border-radius:8px; border:1px solid #333; }
 button { cursor:pointer; }
 .error { color: #ff6b6b; }
