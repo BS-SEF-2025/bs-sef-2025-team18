@@ -4,3 +4,18 @@ input, button { width:100%; padding:10px; margin:8px 0; border-radius:8px; borde
 button { cursor:pointer; }
 .error { color: #ff6b6b; }
 label { display:block; margin-top:10px; }
+.helper {
+  margin-top: 12px;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.helper a {
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.helper a:hover {
+  text-decoration: underline;
+}
+

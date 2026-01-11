@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="he">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -8,23 +8,27 @@
 </head>
 <body>
   <main class="card">
-    <h1>התחברות</h1>
+    <h1>Login</h1>
 
     <form id="loginForm">
       <label>Username</label>
-      <input id="username" required />
+      <input id="username" autocomplete="username" required />
 
       <label>Password</label>
-      <input id="password" type="password" required />
+      <input id="password" type="password" autocomplete="current-password" required />
 
       <p id="error" class="error" hidden>Invalid credentials</p>
 
       <button type="submit">Login</button>
     </form>
+
+    <p class="helper">
+      Don’t have an account?
+      <a href="signup.html">Sign up</a>
+    </p>
   </main>
 
   <script>
-    // Demo users (ללא שרת כרגע)
     const USERS = {
       student1: { password: "1234", role: "student" },
       instructor1: { password: "1234", role: "instructor" }
@@ -32,6 +36,7 @@
 
     document.getElementById("loginForm").addEventListener("submit", (e) => {
       e.preventDefault();
+
       const u = document.getElementById("username").value.trim();
       const p = document.getElementById("password").value;
 
@@ -45,7 +50,6 @@
       }
       err.hidden = true;
 
-      // "Authentication state"
       localStorage.setItem("isLoggedIn", "true");
       localStorage.setItem("username", u);
       localStorage.setItem("role", user.role);
