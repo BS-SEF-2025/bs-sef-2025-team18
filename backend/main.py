@@ -5,9 +5,63 @@ from typing import Optional, Callable
 from . import db
 from .security import hash_password, verify_password
 from .token_service import create_access_token, decode_access_token
+from fastapi import APIRouter, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from . import security
+
 
 
 app = FastAPI(title="PeerEval Pro - Role Based Access")
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+auth_router = APIRouter(prefix="/auth", tags=["auth"])
+
+class SignupBody(BaseModel):
+    username: str
+    password: str
+    role: str  # student / instructor
+
+@auth_router.post("/signup")
+def signup(body: SignupBody):
+    if body.role not in ("student", "instructor"):
+        raise HTTPException(status_code=422, detail="Invalid role")
+
+    if db.get_user_by_username(body.username):
+        raise HTTPException(status_code=409, detail="Username already exists")
+
+    password_hash = security.hash_password(body.password)
+    db.create_user(body.username, password_hash, body.role)
+
+    return {"ok": True}
+
+from fastapi import HTTPException
+from pydantic import BaseModel
+import security
+import db
+
+class SignupBody(BaseModel):
+    username: str
+    password: str
+    role: str  # 'student' or 'instructor'
+
+@app.post("/auth/signup")
+def signup(body: SignupBody):
+    existing = db.get_user_by_username(body.username)
+    if existing:
+        raise HTTPException(status_code=409, detail="Username already exists")
+
+    password_hash = security.hash_password(body.password)
+    db.create_user(body.username, password_hash, body.role)
+    return {"ok": True}
+
 
 db.init_db()
 
@@ -89,3 +143,5 @@ def student_results(user=Depends(require_roles("student"))):
 @app.get("/instructor/publish")
 def instructor_publish(user=Depends(require_roles("instructor"))):
     return {"page": "Publish Peer Review Results", "user": user}
+app.include_router(auth_router)
+
