@@ -71,13 +71,14 @@ def get_user_by_username(username: str) -> Optional[Dict[str, Any]]:
         return dict(row) if row else None
 
 
-def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
+def get_user_by_email(email: str):
     with get_conn() as conn:
         row = conn.execute(
-            "SELECT id, email, username, password_hash, role, created_at FROM users WHERE email=?",
+            "SELECT id, email, username, password_hash, role FROM users WHERE email=?",
             (email,),
         ).fetchone()
         return dict(row) if row else None
+
 def user_exists(username: str) -> bool:
     """Return True if a user with given username exists."""
     return get_user_by_username(username) is not None

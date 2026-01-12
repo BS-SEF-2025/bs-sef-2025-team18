@@ -8,27 +8,29 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from . import db
 from .security import hash_password, verify_password
 from .token_service import create_access_token, decode_access_token
+from .seed import seed_users
+
 app = FastAPI(title="PeerEval Pro - Role Based Access")
 
-# CORS
+# ✅ CORS (for Live Server on 5500)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://127.0.0.1:5500",
         "http://localhost:5500",
+        "http://127.0.0.1:3000",
+        "http://localhost:3000",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
-# Init DB on startup
+# ✅ Init DB + seed only after app starts
 @app.on_event("startup")
 def _startup():
     db.init_db()
-from .seed import seed_users
-seed_users()
+    seed_users()
 
 
 # -------------------------
@@ -40,11 +42,11 @@ USERNAME_RE = re.compile(r"^[A-Za-z0-9_]{3,20}$")
 
 
 def password_is_strong(pw: str) -> bool:
-    # simple rules: >=8 and contains letters+numbers
     return len(pw) >= 8 and any(c.isdigit() for c in pw) and any(c.isalpha() for c in pw)
 
 
 class SignupBody(BaseModel):
+    email: str = Field(min_length=5, max_length=200)
     username: str = Field(min_length=3, max_length=20)
     password: str = Field(min_length=8, max_length=200)
     confirm_password: str = Field(min_length=8, max_length=200)
@@ -55,6 +57,15 @@ class SignupBody(BaseModel):
     def validate_username(cls, v: str) -> str:
         if not USERNAME_RE.match(v):
             raise ValueError("Username must be 3–20 characters (letters, numbers, underscore).")
+        return v
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        v = v.strip()
+        # simple email check
+        if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", v):
+            raise ValueError("Invalid email format.")
         return v
 
     @model_validator(mode="after")
@@ -74,15 +85,34 @@ def signup(body: SignupBody):
     if db.get_user_by_username(body.username):
         raise HTTPException(status_code=409, detail="Username already exists.")
 
+    # duplicate email
+    if db.get_user_by_email(body.email):
+        raise HTTPException(status_code=409, detail="Email already exists.")
+
     password_hash = hash_password(body.password)
-    db.create_user(body.username, password_hash, body.role)
+    db.create_user(body.email, body.username, password_hash, body.role)
+
     return {"ok": True}
 
 
+
 class RegisterBody(BaseModel):
+    email: str
     username: str
     password: str
-    role: str  # "student" or "instructor"
+    role: str
+
+
+@auth_router.post("/register")
+def register(body: RegisterBody):
+    if body.role not in ("student", "instructor"):
+        raise HTTPException(status_code=400, detail="Role must be student or instructor")
+
+    if db.get_user_by_username(body.username):
+        raise HTTPException(status_code=409, detail="Username already exists")
+
+    db.create_user(body.email, body.username, hash_password(body.password), body.role)
+    return {"ok": True}
 
 
 class LoginBody(BaseModel):
@@ -90,28 +120,12 @@ class LoginBody(BaseModel):
     password: str
 
 
-@auth_router.post("/register")
-def register(body: RegisterBody):
-    # (optional endpoint) - keep if you still need it
-    if body.role not in ("student", "instructor"):
-        raise HTTPException(status_code=400, detail="Role must be student or instructor")
-
-    if db.get_user_by_username(body.username):
-        raise HTTPException(status_code=409, detail="Username already exists")
-
-    db.create_user(body.username, hash_password(body.password), body.role)
-    return {"ok": True}
-
-
 @auth_router.post("/login")
 def login(body: LoginBody):
     user = db.get_user_by_username(body.username)
 
     if not user or not verify_password(body.password, user["password_hash"]):
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid credentials. Please check your username and password."
-        )
+        raise HTTPException(status_code=401, detail="Invalid credentials. Please check your username and password.")
 
     token = create_access_token(username=user["username"], role=user["role"])
     return {"access_token": token, "token_type": "bearer", "role": user["role"]}

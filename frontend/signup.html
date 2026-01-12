@@ -13,6 +13,12 @@
     <p class="subtitle">Sign up to use the system</p>
 
     <form id="signupForm">
+      <!-- ✅ Email -->
+      <label>
+        Email
+        <input id="email" type="email" autocomplete="email" required />
+      </label>
+
       <label>
         Username
         <input id="username" type="text" autocomplete="username" required />
@@ -28,7 +34,6 @@
         <input id="confirmPassword" type="password" autocomplete="new-password" required />
       </label>
 
-      <!-- ✅ Added role field -->
       <label>
         Role
         <select id="role" required>

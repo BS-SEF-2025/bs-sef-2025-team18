@@ -15,29 +15,38 @@ function setLoading(isLoading) {
 }
 
 function extractDetail(data) {
-  // FastAPI sometimes returns detail as array for 422 validation errors
   if (!data) return null;
 
+  // FastAPI 422 validation errors sometimes return list in detail
   if (Array.isArray(data.detail)) {
-    // [{loc:..., msg:..., type:...}, ...]
     return data.detail.map((x) => x.msg).join(", ");
   }
   return data.detail || data.message || null;
 }
 
+function isValidEmail(email) {
+  // simple email validation
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
 
+  const email = document.getElementById("email").value.trim();
   const username = document.getElementById("username").value.trim();
   const password = document.getElementById("password").value;
   const confirmPassword = document.getElementById("confirmPassword").value;
 
-  // role is optional in the HTML; default to student if missing
   const roleEl = document.getElementById("role");
   const role = roleEl ? roleEl.value : "student";
 
-  if (!username || !password || !confirmPassword) {
+  if (!email || !username || !password || !confirmPassword || !role) {
     setMessage("Please fill in all fields.", "error");
+    return;
+  }
+
+  if (!isValidEmail(email)) {
+    setMessage("Please enter a valid email address.", "error");
     return;
   }
 
@@ -54,10 +63,11 @@ form.addEventListener("submit", async (e) => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        email,
         username,
         password,
-        confirm_password: confirmPassword, // IMPORTANT: backend expects this exact name
-        role, // "student" or "instructor"
+        confirm_password: confirmPassword, // backend expects this exact name
+        role,
       }),
     });
 
