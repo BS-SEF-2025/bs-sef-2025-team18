@@ -12,8 +12,15 @@
 <body>
   <main class="card">
     <h1>Dashboard</h1>
+
     <p id="who"></p>
     <button id="logout">Logout</button>
+
+    <!-- ✅ STEP 2: Team members section -->
+    <hr />
+    <h2>Team Members</h2>
+    <div id="teamMembers"></div>
+    <p id="teamError" class="error"></p>
   </main>
 
   <script>
@@ -28,5 +35,9 @@
       window.location.href = "login.html";
     });
   </script>
+
+  <!-- ✅ STEP 2: load team logic -->
+  <script src="team.js"></script>
 </body>
 </html>
+
