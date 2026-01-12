@@ -19,7 +19,30 @@
     <!-- ✅ STEP 2: Team members section -->
     <hr />
     <h2>Team Members</h2>
+
+    <!-- Keep the list container if team.js uses it -->
     <div id="teamMembers"></div>
+
+    <!-- ✅ Peer Review -->
+    <hr />
+    <h2>Submit Peer Review</h2>
+
+    <label for="teammateSelect">Choose teammate</label>
+    <select id="teammateSelect">
+      <option value="">-- Select teammate --</option>
+    </select>
+
+    <label for="commentBox">Comment (optional)</label>
+    <textarea
+      id="commentBox"
+      rows="4"
+      maxlength="500"
+      placeholder="Write feedback for your teammate..."></textarea>
+
+    <div id="commentCount" class="helper">0/500</div>
+
+    <button id="submitReviewBtn" type="button">Submit Review</button>
+
     <p id="teamError" class="error"></p>
   </main>
 
@@ -40,4 +63,3 @@
   <script src="team.js"></script>
 </body>
 </html>
-
