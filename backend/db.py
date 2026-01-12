@@ -1,17 +1,32 @@
 import sqlite3
-from typing import Optional, Dict, Any
-
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Optional, Dict, Any
 
 DB_PATH = str(Path(__file__).with_name("app.db"))
 
 
-
-def get_conn() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
+@contextmanager
+def get_conn(path: Optional[str] = None) -> sqlite3.Connection:
+    """
+    IMPORTANT (Windows):
+    sqlite Connection context manager does NOT close the connection.
+    This wrapper ensures every connection is ALWAYS closed.
+    """
+    conn = sqlite3.connect(path or DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
-    return conn
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 def _column_exists(conn: sqlite3.Connection, table: str, column: str) -> bool:
@@ -21,7 +36,6 @@ def _column_exists(conn: sqlite3.Connection, table: str, column: str) -> bool:
 
 def init_db() -> None:
     with get_conn() as conn:
-        # Create table if it doesn't exist (new installs)
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
@@ -35,7 +49,7 @@ def init_db() -> None:
             """
         )
 
-        # Migration for existing DB
+        # Migration for existing DBs (safe to run repeatedly)
         if not _column_exists(conn, "users", "email"):
             conn.execute("ALTER TABLE users ADD COLUMN email TEXT;")
 
@@ -44,13 +58,9 @@ def init_db() -> None:
                 "ALTER TABLE users ADD COLUMN created_at TEXT NOT NULL DEFAULT (datetime('now'));"
             )
 
-        # Ensure unique email
         conn.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users(email);"
         )
-
-        conn.commit()
-
 
 
 def create_user(email: str, username: str, password_hash: str, role: str) -> None:
@@ -59,7 +69,6 @@ def create_user(email: str, username: str, password_hash: str, role: str) -> Non
             "INSERT INTO users (email, username, password_hash, role) VALUES (?, ?, ?, ?)",
             (email, username, password_hash, role),
         )
-        conn.commit()
 
 
 def get_user_by_username(username: str) -> Optional[Dict[str, Any]]:
@@ -71,7 +80,7 @@ def get_user_by_username(username: str) -> Optional[Dict[str, Any]]:
         return dict(row) if row else None
 
 
-def get_user_by_email(email: str):
+def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
     with get_conn() as conn:
         row = conn.execute(
             "SELECT id, email, username, password_hash, role FROM users WHERE email=?",
@@ -79,7 +88,6 @@ def get_user_by_email(email: str):
         ).fetchone()
         return dict(row) if row else None
 
+
 def user_exists(username: str) -> bool:
-    """Return True if a user with given username exists."""
     return get_user_by_username(username) is not None
-    
