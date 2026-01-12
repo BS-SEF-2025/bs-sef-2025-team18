@@ -1,13 +1,19 @@
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Iterator
 
-DB_PATH = str(Path(__file__).with_name("app.db"))
+# ✅ FIX: __file__ may not exist in some run modes (interactive/IDE)
+try:
+    BASE_DIR = Path(__file__).resolve().parent
+except NameError:
+    BASE_DIR = Path.cwd()
+
+DB_PATH = str(BASE_DIR / "app.db")
 
 
 @contextmanager
-def get_conn(path: Optional[str] = None) -> sqlite3.Connection:
+def get_conn(path: Optional[str] = None) -> Iterator[sqlite3.Connection]:
     """
     IMPORTANT (Windows):
     sqlite Connection context manager does NOT close the connection.
