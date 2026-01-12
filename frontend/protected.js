@@ -49,6 +49,8 @@ form.addEventListener("submit", async (e) => {
       localStorage.setItem("access_token", data.access_token);
       localStorage.setItem("role", data.role);
       localStorage.setItem("isLoggedIn", "true");
+      localStorage.setItem("username", username);
+
 
       setMessage("Logged in successfully!", "success");
 
