@@ -1,5 +1,5 @@
-from . import db
-from .security import hash_password
+import db
+from security import hash_password
 
 
 def seed_users() -> None:

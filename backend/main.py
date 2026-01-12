@@ -5,22 +5,17 @@ from fastapi import FastAPI, Depends, HTTPException, Header, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from . import db
-from .security import hash_password, verify_password
-from .token_service import create_access_token, decode_access_token
-from .seed import seed_users, seed_peer_review_criteria
+import db
+from security import hash_password, verify_password
+from token_service import create_access_token, decode_access_token
+from seed import seed_users, seed_peer_review_criteria
 
 app = FastAPI(title="PeerEval Pro - Role Based Access")
 
-# ✅ CORS (for Live Server on 5500)
+# ✅ CORS (allow all origins for development)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://127.0.0.1:5500",
-        "http://localhost:5500",
-        "http://127.0.0.1:3000",
-        "http://localhost:3000",
-    ],
+    allow_origins=["*"],  # Allow all origins for development
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -128,7 +123,7 @@ def login(body: LoginBody):
         raise HTTPException(status_code=401, detail="Invalid credentials. Please check your username and password.")
 
     token = create_access_token(username=user["username"], role=user["role"])
-    return {"access_token": token, "token_type": "bearer", "role": user["role"]}
+    return {"access_token": token, "role": user["role"]}
 
 
 # -------------------------

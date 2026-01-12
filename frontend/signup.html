@@ -3,17 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Sign Up</title>
+  <title>Sign Up - PeerEval Pro</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
-
 <body>
   <div class="card">
     <h1>Create account</h1>
     <p class="subtitle">Sign up to use the system</p>
 
     <form id="signupForm">
-      <!-- ✅ Email -->
       <label>
         Email
         <input id="email" type="email" autocomplete="email" required />
@@ -37,8 +35,8 @@
       <label>
         Role
         <select id="role" required>
-          <option value="student" selected>student</option>
-          <option value="instructor">instructor</option>
+          <option value="student" selected>Student</option>
+          <option value="instructor">Instructor</option>
         </select>
       </label>
 
@@ -52,6 +50,11 @@
       <a href="login.html">Log in</a>
     </p>
   </div>
+
+  <!-- Define global BACKEND_URL -->
+  <script>
+    window.BACKEND_URL = "http://127.0.0.1:8000";
+  </script>
 
   <script src="signup.js"></script>
 </body>
