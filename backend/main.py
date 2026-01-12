@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from . import db
 from .security import hash_password, verify_password
 from .token_service import create_access_token, decode_access_token
-from .seed import seed_users
+from .seed import seed_users, seed_peer_review_criteria
 
 app = FastAPI(title="PeerEval Pro - Role Based Access")
 
@@ -31,6 +31,7 @@ app.add_middleware(
 def _startup():
     db.init_db()
     seed_users()
+    seed_peer_review_criteria()
 
 
 # -------------------------
@@ -93,7 +94,6 @@ def signup(body: SignupBody):
     db.create_user(body.email, body.username, password_hash, body.role)
 
     return {"ok": True}
-
 
 
 class RegisterBody(BaseModel):
@@ -173,4 +173,21 @@ def instructor_publish(user=Depends(require_roles("instructor"))):
     return {"page": "Publish Peer Review Results", "user": user}
 
 
+# -------------------------
+# Peer Review Router (NEW)
+# -------------------------
+peer_review_router = APIRouter(prefix="/peer-reviews", tags=["peer-reviews"])
+
+
+@peer_review_router.get("/form")
+def get_peer_review_form(user=Depends(require_roles("student"))):
+    """
+    Returns teammates (all other students) + predefined evaluation criteria.
+    """
+    teammates = db.get_student_teammates_except(user["username"])
+    criteria = db.get_peer_review_criteria()
+    return {"teammates": teammates, "criteria": criteria}
+
+
+app.include_router(peer_review_router)
 app.include_router(auth_router)
