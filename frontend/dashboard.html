@@ -1,73 +1,85 @@
 <!doctype html>
-<html lang="he">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="styles.css" />
-  <title>Dashboard</title>
+  <title>Dashboard - PeerEval Pro</title>
 
-  <!-- MUST: protects the page -->
+  <!-- Define global BACKEND_URL before any scripts -->
+  <script>
+    window.BACKEND_URL = "http://127.0.0.1:8000";
+  </script>
+
+  <!-- Page protection -->
   <script src="protected.js"></script>
 </head>
 <body>
   <main class="card">
-    <h1>Dashboard</h1>
+    <!-- Header -->
+    <header class="dashboard-header">
+      <div>
+        <h1 id="welcomeText">Dashboard</h1>
+        <p id="userInfo" class="user-info"></p>
+      </div>
+      <button id="logoutBtn" class="logout-btn">Logout</button>
+    </header>
 
-    <p id="who"></p>
-    <button id="logout">Logout</button>
+    <!-- Team Members Section -->
+    <section class="dashboard-section">
+      <h2>Team Members</h2>
+      <div id="teamMembers" class="team-members-grid"></div>
+      <p id="teamError" class="error"></p>
+    </section>
 
-    <!-- Team members -->
-    <hr />
-    <h2>Team Members</h2>
+    <!-- Submit Peer Review Section -->
+    <section class="dashboard-section">
+      <h2>Submit Peer Review</h2>
+      
+      <label for="teammateSelect">Choose teammate to review</label>
+      <select id="teammateSelect">
+        <option value="">-- Select teammate --</option>
+      </select>
 
-    <!-- Keep the list container if team.js uses it -->
-    <div id="teamMembers"></div>
+      <!-- Rating inputs will be rendered here by rating.js -->
+      <div id="ratingContainer" class="rating-container"></div>
 
-    <!-- ✅ Peer Review -->
-    <hr />
-    <h2>Submit Peer Review</h2>
+      <label for="commentBox">Comment (optional, max 500 characters)</label>
+      <textarea
+        id="commentBox"
+        rows="4"
+        maxlength="500"
+        placeholder="Write feedback for your teammate..."></textarea>
+      <div id="commentCount" class="comment-counter">0/500</div>
 
-    <label for="teammateSelect">Choose teammate</label>
-    <select id="teammateSelect">
-      <option value="">-- Select teammate --</option>
-    </select>
-
-    <label for="commentBox">Comment (optional)</label>
-    <textarea
-      id="commentBox"
-      rows="4"
-      maxlength="500"
-      placeholder="Write feedback for your teammate..."></textarea>
-
-    <div id="commentCount" class="helper">0/500</div>
-
-    <button id="submitReviewBtn" type="button">Submit Review</button>
-
-    <p id="teamError" class="error"></p>
-
-    <!-- Peer review -->
-    <hr />
-    <h2>Peer Review</h2>
-    <div id="peerReview"></div>
-    <p id="reviewError" class="error"></p>
+      <button id="submitReviewBtn" type="button" class="submit-btn">Submit Review</button>
+      
+      <div id="submitMessage" class="msg" aria-live="polite"></div>
+    </section>
   </main>
 
-  <script>
-    const username = localStorage.getItem("username") || "unknown";
-    const role = localStorage.getItem("role") || "unknown";
-    document.getElementById("who").textContent = `Hello ${username} (${role})`;
-
-    document.getElementById("logout").addEventListener("click", () => {
-      localStorage.removeItem("isLoggedIn");
-      localStorage.removeItem("username");
-      localStorage.removeItem("role");
-      localStorage.removeItem("access_token");
-      window.location.href = "login.html";
-    });
-  </script>
-
-  <!-- load logic -->
+  <!-- Load scripts after DOM -->
   <script src="team.js"></script>
   <script src="rating.js"></script>
+
+  <script>
+    // Initialize dashboard header
+    document.addEventListener("DOMContentLoaded", () => {
+      const username = localStorage.getItem("username") || "User";
+      const role = localStorage.getItem("role") || "unknown";
+      
+      document.getElementById("welcomeText").textContent = `Hello, ${username}`;
+      document.getElementById("userInfo").textContent = `Role: ${role}`;
+
+      // Logout handler
+      document.getElementById("logoutBtn").addEventListener("click", () => {
+        localStorage.removeItem("isLoggedIn");
+        localStorage.removeItem("username");
+        localStorage.removeItem("role");
+        localStorage.removeItem("access_token");
+        window.location.href = "login.html";
+      });
+    });
+  </script>
 </body>
 </html>

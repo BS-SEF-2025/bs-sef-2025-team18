@@ -1,65 +1,97 @@
-const BACKEND_URL = "http://127.0.0.1:8000";
+(function() {
+  'use strict';
+  // Use global BACKEND_URL from window
+  const BACKEND_URL = window.BACKEND_URL;
 
-document.addEventListener("DOMContentLoaded", async () => {
-  const container = document.getElementById("teamMembers");
-  const errorEl = document.getElementById("teamError");
+  document.addEventListener("DOMContentLoaded", async () => {
+    const container = document.getElementById("teamMembers");
+    const teammateSelect = document.getElementById("teammateSelect");
+    const errorEl = document.getElementById("teamError");
 
-  const token = localStorage.getItem("access_token");
-  const currentUsername = (localStorage.getItem("username") || "").toLowerCase();
+    const token = localStorage.getItem("access_token");
+    const currentUsername = (localStorage.getItem("username") || "").toLowerCase();
 
-  if (!token) {
-    errorEl.textContent = "Not logged in.";
-    return;
-  }
-
-  const MEMBERS_ENDPOINT = `${BACKEND_URL}/team/members`; // عدّل إذا لازم
-
-  try {
-    const res = await fetch(MEMBERS_ENDPOINT, {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-      },
-    });
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(`HTTP ${res.status} ${text}`);
-    }
-
-    const members = await res.json();
-
-    const filtered = members.filter(m => {
-      const u = (m.username || "").toLowerCase();
-      // إذا backend ما برجع username، ما نستثني (بس ما نخرب)
-      if (!u) return true;
-      return u !== currentUsername;
-    });
-
-    container.innerHTML = "";
-
-    if (!Array.isArray(filtered) || filtered.length === 0) {
-      container.innerHTML = `<p class="muted">No teammates found.</p>`;
+    if (!token) {
+      if (errorEl) errorEl.textContent = "Not logged in.";
       return;
     }
 
-    filtered.forEach(m => {
-      const card = document.createElement("div");
-      card.className = "member-card";
+    // Fetch teammates from /peer-reviews/form
+    let members = [];
+    try {
+      const formRes = await fetch(`${BACKEND_URL}/peer-reviews/form`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
+      });
 
-      const displayName = m.name || m.username || "Unnamed";
-      const displayEmail = m.email || "";
+      if (!formRes.ok) {
+        const text = await formRes.text().catch(() => "");
+        throw new Error(`Failed to fetch teammates: HTTP ${formRes.status} ${text}`);
+      }
 
-      card.innerHTML = `
-        <div class="member-name">${displayName}</div>
-        ${displayEmail ? `<div class="member-meta">${displayEmail}</div>` : ""}
-      `;
+      const formData = await formRes.json();
+      members = formData.teammates || [];
+      
+      if (!Array.isArray(members)) {
+        members = [];
+      }
+    } catch (e) {
+      console.error("Failed to load teammates:", e);
+      if (errorEl) {
+        errorEl.textContent = `Failed to load team members: ${e.message || "Check backend logs."}`;
+      }
+      return;
+    }
 
-      container.appendChild(card);
-    });
+    // Clear error
+    if (errorEl) errorEl.textContent = "";
 
-  } catch (e) {
-    console.error(e);
-    errorEl.textContent = "Failed to load team members. Check /team/members and backend logs.";
+    // Populate #teamMembers (display cards)
+    if (container) {
+      container.innerHTML = "";
+
+      if (members.length === 0) {
+        container.innerHTML = `<p class="muted">No teammates found.</p>`;
+      } else {
+        members.forEach(m => {
+          const card = document.createElement("div");
+          card.className = "member-card";
+
+          const displayName = m.name || m.username || "Unnamed";
+          const displayEmail = m.email || "";
+
+          card.innerHTML = `
+            <div class="member-name">${escapeHtml(displayName)}</div>
+            ${displayEmail ? `<div class="member-meta">${escapeHtml(displayEmail)}</div>` : ""}
+          `;
+
+          container.appendChild(card);
+        });
+      }
+    }
+
+    // Populate #teammateSelect (dropdown)
+    if (teammateSelect) {
+      // Clear existing options except the first placeholder
+      teammateSelect.innerHTML = '<option value="">-- Select teammate --</option>';
+
+      if (members.length > 0) {
+        members.forEach(m => {
+          const option = document.createElement("option");
+          option.value = m.id;
+          option.textContent = m.name || m.username || "Unnamed";
+          teammateSelect.appendChild(option);
+        });
+      }
+    }
+  });
+
+  // Helper to escape HTML
+  function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
   }
-});
+})();

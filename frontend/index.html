@@ -2,30 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Peer Review System - Login</title>
-  <link rel="stylesheet" href="./style.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PeerEval Pro - Peer Review System</title>
 </head>
 <body>
-  <main class="card">
-    <h1>Login</h1>
-
-    <form id="loginForm">
-      <label>
-        Username
-        <input id="username" type="text" required />
-      </label>
-
-      <label>
-        Password
-        <input id="password" type="password" required />
-      </label>
-
-      <button type="submit">Sign in</button>
-      <p id="msg" class="msg"></p>
-    </form>
-  </main>
-
-  <script src="./app.js"></script>
+  <script>
+    // Redirect to dashboard if logged in, otherwise to login
+    const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
+    const token = localStorage.getItem("access_token");
+    
+    if (isLoggedIn && token) {
+      window.location.href = "dashboard.html";
+    } else {
+      window.location.href = "login.html";
+    }
+  </script>
 </body>
 </html>
