@@ -174,7 +174,7 @@ def instructor_publish(user=Depends(require_roles("instructor"))):
 
 
 # -------------------------
-# Peer Review Router (NEW)
+# Peer Review Router
 # -------------------------
 peer_review_router = APIRouter(prefix="/peer-reviews", tags=["peer-reviews"])
 
@@ -187,6 +187,85 @@ def get_peer_review_form(user=Depends(require_roles("student"))):
     teammates = db.get_student_teammates_except(user["username"])
     criteria = db.get_peer_review_criteria()
     return {"teammates": teammates, "criteria": criteria}
+
+
+# ---------- Validation Models ----------
+class AnswerIn(BaseModel):
+    criterion_id: int
+    rating: int
+
+
+class ReviewForTeammateIn(BaseModel):
+    teammate_id: int
+    answers: list[AnswerIn]
+
+
+class SubmitPeerReviewBody(BaseModel):
+    reviews: list[ReviewForTeammateIn]
+
+
+@peer_review_router.post("/submit")
+def submit_peer_review(body: SubmitPeerReviewBody, user=Depends(require_roles("student"))):
+    """
+    Validates that all required criteria are answered for each teammate
+    and ratings are within the allowed scale.
+    """
+    teammates = db.get_student_teammates_except(user["username"])
+    allowed_teammate_ids = {t["id"] for t in teammates}
+
+    criteria = db.get_peer_review_criteria()
+    criteria_by_id = {c["id"]: c for c in criteria}
+    required_criteria_ids = {c["id"] for c in criteria if c["required"]}
+
+    errors = []
+
+    if not body.reviews:
+        raise HTTPException(status_code=400, detail=[{"message": "No reviews submitted"}])
+
+    for r in body.reviews:
+        if r.teammate_id not in allowed_teammate_ids:
+            errors.append({"teammate_id": r.teammate_id, "message": "Invalid teammate"})
+            continue
+
+        answered_ids = set()
+
+        for a in r.answers:
+            crit = criteria_by_id.get(a.criterion_id)
+            if not crit:
+                errors.append(
+                    {"teammate_id": r.teammate_id, "criterion_id": a.criterion_id, "message": "Invalid criterion"}
+                )
+                continue
+
+            smin = crit["scale"]["min"]
+            smax = crit["scale"]["max"]
+
+            if a.rating is None:
+                errors.append(
+                    {"teammate_id": r.teammate_id, "criterion_id": a.criterion_id, "message": "Rating is required"}
+                )
+                continue
+
+            if not (smin <= a.rating <= smax):
+                errors.append(
+                    {
+                        "teammate_id": r.teammate_id,
+                        "criterion_id": a.criterion_id,
+                        "message": f"Rating must be between {smin} and {smax}",
+                    }
+                )
+                continue
+
+            answered_ids.add(a.criterion_id)
+
+        for cid in (required_criteria_ids - answered_ids):
+            errors.append({"teammate_id": r.teammate_id, "criterion_id": cid, "message": "Rating is required"})
+
+    if errors:
+        raise HTTPException(status_code=400, detail=errors)
+
+    # Validation success (saving can be another subtask)
+    return {"ok": True}
 
 
 app.include_router(peer_review_router)
