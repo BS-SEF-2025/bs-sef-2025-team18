@@ -1,21 +1,125 @@
-body { font-family: Arial, sans-serif; background:#222163b7; color:#eee; margin:0; }
-.card { max-width:360px; margin:60px auto; padding:20px; background:#501f1f; border-radius:12px; }
-input, button { width:100%; padding:10px; margin:8px 0; border-radius:8px; border:1px solid #333; }
-button { cursor:pointer; }
-.error { color: #ff6b6b; }
-label { display:block; margin-top:10px; }
-.helper {
-  margin-top: 12px;
-  font-size: 14px;
-  opacity: 0.9;
+/* ===== Base ===== */
+body {
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  color: #f5f7fa;
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.helper a {
+/* ===== Card ===== */
+.card {
+  max-width: 380px;
+  width: 100%;
+  padding: 24px 26px;
+  background: #ffffff;
+  color: #2c3e50;
+  border-radius: 14px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+}
+
+/* ===== Titles ===== */
+.card h1 {
+  margin: 0 0 6px 0;
+  text-align: center;
+  color: #1e3c72;
+}
+
+.subtitle {
+  text-align: center;
+  font-size: 14px;
+  margin-bottom: 18px;
+  color: #6b7280;
+}
+
+/* ===== Form ===== */
+label {
+  display: block;
+  margin-top: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+input,
+select {
+  width: 100%;
+  padding: 11px 12px;
+  margin-top: 6px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 14px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: #2a5298;
+  box-shadow: 0 0 0 3px rgba(42, 82, 152, 0.2);
+}
+
+/* ===== Button ===== */
+button {
+  width: 100%;
+  margin-top: 18px;
+  padding: 12px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(30, 60, 114, 0.35);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ===== Messages ===== */
+.msg {
+  margin-top: 14px;
+  font-size: 14px;
+}
+
+.msg.error {
+  color: #dc2626;
+}
+
+.msg.success {
+  color: #16a34a;
+}
+
+/* ===== Footer / Helper ===== */
+.helper,
+.footer {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.helper a,
+.footer a {
+  color: #1e3c72;
   text-decoration: none;
   font-weight: 600;
 }
 
-.helper a:hover {
+.helper a:hover,
+.footer a:hover {
   text-decoration: underline;
 }
+
 

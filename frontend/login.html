@@ -6,21 +6,26 @@
   <link rel="stylesheet" href="styles.css" />
   <title>Login</title>
 </head>
+
 <body>
   <main class="card">
     <h1>Login</h1>
 
     <form id="loginForm">
-      <label>Username</label>
-      <input id="username" autocomplete="username" required />
+      <label>
+        Username
+        <input id="username" autocomplete="username" required />
+      </label>
 
-      <label>Password</label>
-      <input id="password" type="password" autocomplete="current-password" required />
+      <label>
+        Password
+        <input id="password" type="password" autocomplete="current-password" required />
+      </label>
 
-      <p id="error" class="error" hidden>Invalid credentials</p>
-
-      <button type="submit">Login</button>
+      <button id="submitBtn" type="submit">Login</button>
     </form>
+
+    <div id="msg" class="msg" aria-live="polite"></div>
 
     <p class="helper">
       Don’t have an account?
@@ -28,34 +33,6 @@
     </p>
   </main>
 
-  <script>
-    const USERS = {
-      student1: { password: "1234", role: "student" },
-      instructor1: { password: "1234", role: "instructor" }
-    };
-
-    document.getElementById("loginForm").addEventListener("submit", (e) => {
-      e.preventDefault();
-
-      const u = document.getElementById("username").value.trim();
-      const p = document.getElementById("password").value;
-
-      const user = USERS[u];
-      const ok = user && user.password === p;
-
-      const err = document.getElementById("error");
-      if (!ok) {
-        err.hidden = false;
-        return;
-      }
-      err.hidden = true;
-
-      localStorage.setItem("isLoggedIn", "true");
-      localStorage.setItem("username", u);
-      localStorage.setItem("role", user.role);
-
-      window.location.href = "dashboard.html";
-    });
-  </script>
+  <script src="protected.js"></script>
 </body>
 </html>
