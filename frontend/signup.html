@@ -6,6 +6,7 @@
   <title>Sign Up</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body>
   <div class="card">
     <h1>Create account</h1>
@@ -25,6 +26,15 @@
       <label>
         Confirm Password
         <input id="confirmPassword" type="password" autocomplete="new-password" required />
+      </label>
+
+      <!-- ✅ Added role field -->
+      <label>
+        Role
+        <select id="role" required>
+          <option value="student" selected>student</option>
+          <option value="instructor">instructor</option>
+        </select>
       </label>
 
       <button id="submitBtn" type="submit">Sign Up</button>

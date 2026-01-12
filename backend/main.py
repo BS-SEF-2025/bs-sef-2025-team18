@@ -1,69 +1,82 @@
-from fastapi import FastAPI, Depends, HTTPException, Header
-from pydantic import BaseModel
+import re
 from typing import Optional, Callable
+
+from fastapi import FastAPI, Depends, HTTPException, Header, APIRouter
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from . import db
 from .security import hash_password, verify_password
 from .token_service import create_access_token, decode_access_token
-from fastapi import APIRouter, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from . import security
-
-
-
 app = FastAPI(title="PeerEval Pro - Role Based Access")
-from fastapi.middleware.cors import CORSMiddleware
 
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://127.0.0.1:5500",
+        "http://localhost:5500",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Init DB on startup
+@app.on_event("startup")
+def _startup():
+    db.init_db()
+from .seed import seed_users
+seed_users()
+
+
+# -------------------------
+# Auth Router
+# -------------------------
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
+USERNAME_RE = re.compile(r"^[A-Za-z0-9_]{3,20}$")
+
+
+def password_is_strong(pw: str) -> bool:
+    # simple rules: >=8 and contains letters+numbers
+    return len(pw) >= 8 and any(c.isdigit() for c in pw) and any(c.isalpha() for c in pw)
+
+
 class SignupBody(BaseModel):
-    username: str
-    password: str
+    username: str = Field(min_length=3, max_length=20)
+    password: str = Field(min_length=8, max_length=200)
+    confirm_password: str = Field(min_length=8, max_length=200)
     role: str  # student / instructor
 
-@auth_router.post("/signup")
-def signup(body: SignupBody):
-    if body.role not in ("student", "instructor"):
-        raise HTTPException(status_code=422, detail="Invalid role")
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        if not USERNAME_RE.match(v):
+            raise ValueError("Username must be 3–20 characters (letters, numbers, underscore).")
+        return v
 
+    @model_validator(mode="after")
+    def validate_all(self):
+        if self.password != self.confirm_password:
+            raise ValueError("Passwords do not match.")
+        if not password_is_strong(self.password):
+            raise ValueError("Password must be at least 8 characters and contain letters and numbers.")
+        if self.role not in ("student", "instructor"):
+            raise ValueError("Invalid role.")
+        return self
+
+
+@auth_router.post("/signup", status_code=201)
+def signup(body: SignupBody):
+    # duplicate username
     if db.get_user_by_username(body.username):
-        raise HTTPException(status_code=409, detail="Username already exists")
+        raise HTTPException(status_code=409, detail="Username already exists.")
 
-    password_hash = security.hash_password(body.password)
-    db.create_user(body.username, password_hash, body.role)
-
-    return {"ok": True}
-
-from fastapi import HTTPException
-from pydantic import BaseModel
-import security
-import db
-
-class SignupBody(BaseModel):
-    username: str
-    password: str
-    role: str  # 'student' or 'instructor'
-
-@app.post("/auth/signup")
-def signup(body: SignupBody):
-    existing = db.get_user_by_username(body.username)
-    if existing:
-        raise HTTPException(status_code=409, detail="Username already exists")
-
-    password_hash = security.hash_password(body.password)
+    password_hash = hash_password(body.password)
     db.create_user(body.username, password_hash, body.role)
     return {"ok": True}
-
-
-db.init_db()
 
 
 class RegisterBody(BaseModel):
@@ -77,6 +90,36 @@ class LoginBody(BaseModel):
     password: str
 
 
+@auth_router.post("/register")
+def register(body: RegisterBody):
+    # (optional endpoint) - keep if you still need it
+    if body.role not in ("student", "instructor"):
+        raise HTTPException(status_code=400, detail="Role must be student or instructor")
+
+    if db.get_user_by_username(body.username):
+        raise HTTPException(status_code=409, detail="Username already exists")
+
+    db.create_user(body.username, hash_password(body.password), body.role)
+    return {"ok": True}
+
+
+@auth_router.post("/login")
+def login(body: LoginBody):
+    user = db.get_user_by_username(body.username)
+
+    if not user or not verify_password(body.password, user["password_hash"]):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid credentials. Please check your username and password."
+        )
+
+    token = create_access_token(username=user["username"], role=user["role"])
+    return {"access_token": token, "token_type": "bearer", "role": user["role"]}
+
+
+# -------------------------
+# Auth dependencies & protected routes
+# -------------------------
 def get_current_user(authorization: Optional[str] = Header(default=None)):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing Bearer token")
@@ -101,40 +144,11 @@ def require_roles(*allowed_roles: str) -> Callable:
     return _dep
 
 
-@app.post("/auth/register")
-def register(body: RegisterBody):
-    if body.role not in ("student", "instructor"):
-        raise HTTPException(status_code=400, detail="Role must be student or instructor")
-
-    existing = db.get_user_by_username(body.username)
-    if existing:
-        raise HTTPException(status_code=409, detail="Username already exists")
-
-    db.create_user(body.username, hash_password(body.password), body.role)
-    return {"ok": True}
-
-
-@app.post("/auth/login")
-def login(body: LoginBody):
-    user = db.get_user_by_username(body.username)
-
-    # ✅ Invalid credentials -> error message
-    if not user or not verify_password(body.password, user["password_hash"]):
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid credentials. Please check your username and password."
-        )
-
-    token = create_access_token(username=user["username"], role=user["role"])
-    return {"access_token": token, "token_type": "bearer", "role": user["role"]}
-
-
 @app.get("/me")
 def me(user=Depends(get_current_user)):
     return user
 
 
-# Example protected pages/features:
 @app.get("/student/results")
 def student_results(user=Depends(require_roles("student"))):
     return {"page": "Student Peer Review Results", "user": user}
@@ -143,5 +157,6 @@ def student_results(user=Depends(require_roles("student"))):
 @app.get("/instructor/publish")
 def instructor_publish(user=Depends(require_roles("instructor"))):
     return {"page": "Publish Peer Review Results", "user": user}
-app.include_router(auth_router)
 
+
+app.include_router(auth_router)
