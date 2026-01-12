@@ -19,12 +19,19 @@
     // Fetch teammates from /peer-reviews/form
     let members = [];
     try {
+      // Add timeout to prevent hanging if backend is not running
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
       const formRes = await fetch(`${BACKEND_URL}/peer-reviews/form`, {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,
         },
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
       if (!formRes.ok) {
         const text = await formRes.text().catch(() => "");
@@ -40,7 +47,11 @@
     } catch (e) {
       console.error("Failed to load teammates:", e);
       if (errorEl) {
-        errorEl.textContent = `Failed to load team members: ${e.message || "Check backend logs."}`;
+        let errorMessage = e.message || "Check backend logs.";
+        if (e.name === 'AbortError') {
+          errorMessage = `Backend server not responding. Please ensure the backend is running on ${BACKEND_URL}`;
+        }
+        errorEl.textContent = `Failed to load team members: ${errorMessage}`;
       }
       return;
     }

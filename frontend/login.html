@@ -7,31 +7,65 @@
   <title>Login - PeerEval Pro</title>
 </head>
 <body>
-  <main class="card">
-    <h1>Login</h1>
-    <p class="subtitle">Sign in to your account</p>
+  <div class="auth-container">
+    <main class="auth-card">
+      <div class="auth-header">
+        <div class="auth-logo">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h1>Welcome Back</h1>
+        <p class="auth-subtitle">Log in to continue to PeerEval Pro</p>
+      </div>
 
-    <form id="loginForm">
-      <label>
-        Username
-        <input id="username" type="text" autocomplete="username" required />
-      </label>
+      <form id="loginForm" class="auth-form">
+        <div class="form-group">
+          <label for="username" class="form-label">
+            <span class="label-text">Username</span>
+            <input 
+              id="username" 
+              type="text" 
+              class="form-input" 
+              autocomplete="username" 
+              placeholder="Enter your username"
+              required 
+            />
+          </label>
+        </div>
 
-      <label>
-        Password
-        <input id="password" type="password" autocomplete="current-password" required />
-      </label>
+        <div class="form-group">
+          <label for="password" class="form-label">
+            <span class="label-text">Password</span>
+            <input 
+              id="password" 
+              type="password" 
+              class="form-input" 
+              autocomplete="current-password" 
+              placeholder="Enter your password"
+              required 
+            />
+          </label>
+        </div>
 
-      <button id="submitBtn" type="submit">Login</button>
-    </form>
+        <button id="submitBtn" type="submit" class="auth-button">
+          <span class="button-text">Log In</span>
+          <span class="button-loader"></span>
+        </button>
+      </form>
 
-    <div id="msg" class="msg" aria-live="polite"></div>
+      <div id="msg" class="msg" aria-live="polite"></div>
 
-    <p class="helper">
-      Don't have an account?
-      <a href="signup.html">Sign up</a>
-    </p>
-  </main>
+      <div class="auth-footer">
+        <p class="auth-link-text">
+          Don't have an account?
+          <a href="signup.html" class="auth-link">Create one now</a>
+        </p>
+      </div>
+    </main>
+  </div>
 
   <!-- Define global BACKEND_URL -->
   <script>

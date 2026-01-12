@@ -14,7 +14,13 @@ function setMessage(text, type = "info") {
 function setLoading(isLoading) {
   if (!btn) return;
   btn.disabled = isLoading;
-  btn.textContent = isLoading ? "Signing up..." : "Sign Up";
+  const buttonText = btn.querySelector(".button-text");
+  if (buttonText) {
+    buttonText.textContent = isLoading ? "Logging in..." : "Login";
+  } else {
+    // Fallback if button-text element doesn't exist
+    btn.textContent = isLoading ? "Logging in..." : "Login";
+  }
 }
 
 function extractDetail(data) {
@@ -49,6 +55,8 @@ if (form) {
     setMessage("");
 
     try {
+      console.log("Attempting login for:", username);
+      console.log("Backend URL:", BACKEND_URL);
       const res = await fetch(`${BACKEND_URL}/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -61,28 +69,70 @@ if (form) {
         }),
       });
 
+      console.log("Response received. Status:", res.status, res.statusText);
+
       const ct = res.headers.get("content-type") || "";
-      const data = ct.includes("application/json") ? await res.json() : null;
+      let data = null;
+      
+      try {
+        const responseText = await res.text();
+        console.log("Response status:", res.status);
+        console.log("Response headers:", Object.fromEntries(res.headers.entries()));
+        console.log("Response body (first 500 chars):", responseText.substring(0, 500));
+        console.log("Request URL was:", `${BACKEND_URL}/auth/signup`);
+        
+        if (ct.includes("application/json") || responseText.trim().startsWith("{")) {
+          data = JSON.parse(responseText);
+        } else {
+          console.error("Non-JSON response received. Full response:", responseText);
+          // Show more helpful error message
+          let errorMsg = "Server returned non-JSON response. ";
+          if (responseText.includes("404") || responseText.includes("Not Found")) {
+            errorMsg += `The endpoint ${BACKEND_URL}/auth/signup was not found. Is the backend running?`;
+          } else if (responseText.includes("<!DOCTYPE") || responseText.includes("<html")) {
+            errorMsg += "Received HTML instead of JSON. The backend might not be running or the URL is incorrect.";
+          } else {
+            errorMsg += `Response: ${responseText.substring(0, 200)}`;
+          }
+          setMessage(errorMsg, "error");
+          setLoading(false);
+          return;
+        }
+      } catch (parseErr) {
+        console.error("Failed to parse response:", parseErr);
+        setMessage("Failed to parse server response. Please check backend.", "error");
+        setLoading(false);
+        return;
+      }
 
       if (res.status === 201 || res.ok) {
         setMessage("Account created! Redirecting to login...", "success");
-        setTimeout(() => {
-          window.location.href = "login.html";
-        }, 900);
+        setLoading(false);
+        // Redirect immediately
+        window.location.href = "login.html";
         return;
       }
 
       if (res.status === 409) {
         const detail = extractDetail(data) || "Username or email already exists.";
         setMessage(detail, "error");
+        setLoading(false);
         return;
       }
 
       const detail = extractDetail(data) || `Signup failed (HTTP ${res.status}).`;
       setMessage(detail, "error");
+      setLoading(false);
     } catch (err) {
-      setMessage("Network error: backend not reachable. Is it running?", "error");
-    } finally {
+      console.error("Signup error:", err);
+      console.error("Error name:", err.name);
+      console.error("Error message:", err.message);
+      
+      if (err.message && (err.message.includes("Failed to fetch") || err.message.includes("NetworkError") || err.message.includes("Load failed"))) {
+        setMessage("Cannot connect to backend server. Please ensure the backend is running. From the backend folder, run: python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000", "error");
+      } else {
+        setMessage("Connection error: " + (err.message || err.toString()), "error");
+      }
       setLoading(false);
     }
   });

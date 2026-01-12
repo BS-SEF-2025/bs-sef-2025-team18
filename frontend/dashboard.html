@@ -14,63 +14,204 @@
   <!-- Page protection -->
   <script src="protected.js"></script>
 </head>
-<body>
-  <main class="card">
-    <!-- Header -->
-    <header class="dashboard-header">
-      <div>
-        <h1 id="welcomeText">Dashboard</h1>
-        <p id="userInfo" class="user-info"></p>
+<body class="dashboard-body">
+  <!-- Top Navigation Bar -->
+  <nav class="dashboard-nav">
+    <div class="nav-brand">
+      <span class="brand-icon">📊</span>
+      <span class="brand-text">PeerEval Pro</span>
+    </div>
+    <div class="nav-user">
+      <div class="user-profile">
+        <div class="user-avatar">
+          <span id="userInitial">U</span>
+        </div>
+        <div class="user-details">
+          <span class="user-name" id="userNameDisplay">User</span>
+          <span class="user-role" id="userRoleDisplay">Student</span>
+        </div>
       </div>
-      <button id="logoutBtn" class="logout-btn">Logout</button>
-    </header>
+      <button id="logoutBtn" class="logout-btn-nav">
+        <span>🚪</span>
+        <span>Logout</span>
+      </button>
+    </div>
+  </nav>
 
-    <!-- Team Members Section -->
-    <section class="dashboard-section">
-      <h2>Team Members</h2>
-      <div id="teamMembers" class="team-members-grid"></div>
-      <p id="teamError" class="error"></p>
-    </section>
+  <!-- Main Dashboard Container -->
+  <div class="dashboard-container">
+    <!-- Welcome Header -->
+    <div class="dashboard-welcome">
+      <h1 id="welcomeText">Welcome back!</h1>
+      <p class="welcome-subtitle">Manage your peer reviews and track your team activity</p>
+    </div>
 
-    <!-- Submit Peer Review Section -->
-    <section class="dashboard-section">
-      <h2>Submit Peer Review</h2>
-      
-      <label for="teammateSelect">Choose teammate to review</label>
-      <select id="teammateSelect">
-        <option value="">-- Select teammate --</option>
-      </select>
+    <!-- Stats Cards -->
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-card stat-primary">
+        <div class="stat-icon">👥</div>
+        <div class="stat-content">
+          <div class="stat-value" id="teamCount">-</div>
+          <div class="stat-label">Team Members</div>
+        </div>
+      </div>
+      <div class="stat-card stat-secondary">
+        <div class="stat-icon">⭐</div>
+        <div class="stat-content">
+          <div class="stat-value">Ready</div>
+          <div class="stat-label">Review Status</div>
+        </div>
+      </div>
+      <div class="stat-card stat-success">
+        <div class="stat-icon">📝</div>
+        <div class="stat-content">
+          <div class="stat-value">Active</div>
+          <div class="stat-label">Session Status</div>
+        </div>
+      </div>
+    </div>
 
-      <!-- Rating inputs will be rendered here by rating.js -->
-      <div id="ratingContainer" class="rating-container"></div>
+    <!-- Main Content Grid -->
+    <div class="dashboard-grid">
+      <!-- Team Members Card -->
+      <section class="dashboard-card">
+        <div class="card-header">
+          <h2 class="card-title">
+            <span class="card-icon">👥</span>
+            Team Members
+          </h2>
+        </div>
+        <div class="card-body">
+          <div id="teamMembers" class="team-members-grid"></div>
+          <p id="teamError" class="error"></p>
+        </div>
+      </section>
 
-      <label for="commentBox">Comment (optional, max 500 characters)</label>
-      <textarea
-        id="commentBox"
-        rows="4"
-        maxlength="500"
-        placeholder="Write feedback for your teammate..."></textarea>
-      <div id="commentCount" class="comment-counter">0/500</div>
+      <!-- Submit Review Card -->
+      <section class="dashboard-card dashboard-card-wide review-card">
+        <div class="card-header">
+          <div class="card-header-content">
+            <h2 class="card-title">
+              <span class="card-icon">✍️</span>
+              Submit Peer Review
+            </h2>
+            <p class="card-subtitle">Provide honest and constructive feedback for your teammates</p>
+          </div>
+        </div>
+        <div class="card-body review-form-body">
+          <!-- Step 1: Select Teammate -->
+          <div class="form-step">
+            <div class="step-header">
+              <span class="step-number">1</span>
+              <div class="step-title-group">
+                <label for="teammateSelect" class="form-label-large">
+                  Select Teammate
+                  <span class="required-indicator">*</span>
+                </label>
+                <p class="form-help-text">Choose the teammate you want to review</p>
+              </div>
+            </div>
+            <div class="form-input-wrapper">
+              <select id="teammateSelect" class="form-select-enhanced">
+                <option value="">-- Select a teammate --</option>
+              </select>
+              <span class="input-icon">👤</span>
+            </div>
+          </div>
 
-      <button id="submitReviewBtn" type="button" class="submit-btn">Submit Review</button>
-      
-      <div id="submitMessage" class="msg" aria-live="polite"></div>
-    </section>
-  </main>
+          <!-- Step 2: Rating Criteria -->
+          <div class="form-step rating-step">
+            <div class="step-header">
+              <span class="step-number">2</span>
+              <div class="step-title-group">
+                <label class="form-label-large">Rating Criteria</label>
+                <p class="form-help-text">Rate your teammate on the following criteria</p>
+              </div>
+            </div>
+            <!-- Rating inputs will be rendered here by rating.js -->
+            <div id="ratingContainer" class="rating-container-enhanced"></div>
+          </div>
+
+          <!-- Step 3: Additional Comments -->
+          <div class="form-step">
+            <div class="step-header">
+              <span class="step-number">3</span>
+              <div class="step-title-group">
+                <label for="commentBox" class="form-label-large">
+                  Additional Comments
+                  <span class="optional-badge">Optional</span>
+                </label>
+                <p class="form-help-text">Share detailed feedback or suggestions (max 500 characters)</p>
+              </div>
+            </div>
+            <div class="form-input-wrapper textarea-wrapper">
+              <textarea
+                id="commentBox"
+                rows="5"
+                maxlength="500"
+                class="form-textarea-enhanced"
+                placeholder="Provide constructive feedback that will help your teammate improve. Be specific and actionable in your comments..."></textarea>
+              <div class="textarea-footer">
+                <div id="commentCount" class="comment-counter-enhanced">
+                  <span class="char-count">0</span>
+                  <span class="char-separator">/</span>
+                  <span class="char-max">500</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Submit Section -->
+          <div class="form-submit-section">
+            <button id="submitReviewBtn" type="button" class="submit-btn-primary">
+              <span class="btn-icon">✓</span>
+              <span>Submit Review</span>
+            </button>
+            <div id="submitMessage" class="msg" aria-live="polite"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
 
   <!-- Load scripts after DOM -->
   <script src="team.js"></script>
   <script src="rating.js"></script>
 
   <script>
-    // Initialize dashboard header
+    // Initialize dashboard
     document.addEventListener("DOMContentLoaded", () => {
       const username = localStorage.getItem("username") || "User";
-      const role = localStorage.getItem("role") || "unknown";
+      const role = localStorage.getItem("role") || "student";
       
-      document.getElementById("welcomeText").textContent = `Hello, ${username}`;
-      document.getElementById("userInfo").textContent = `Role: ${role}`;
+      // Update welcome text
+      document.getElementById("welcomeText").textContent = `Welcome, ${username}!`;
+      
+      // Update user profile
+      const userNameDisplay = document.getElementById("userNameDisplay");
+      const userRoleDisplay = document.getElementById("userRoleDisplay");
+      const userInitial = document.getElementById("userInitial");
+      
+      if (userNameDisplay) userNameDisplay.textContent = username;
+      if (userRoleDisplay) userRoleDisplay.textContent = role.charAt(0).toUpperCase() + role.slice(1);
+      if (userInitial) userInitial.textContent = username.charAt(0).toUpperCase();
 
+      // Function to update team count
+      function updateTeamCount() {
+        const teamMembers = document.getElementById("teamMembers");
+        const teamCountEl = document.getElementById("teamCount");
+        if (teamMembers && teamCountEl) {
+          const memberCards = teamMembers.querySelectorAll('.member-card');
+          const mutedText = teamMembers.querySelector('.muted');
+          // If there's a "No teammates" message, count is 0
+          if (mutedText && mutedText.textContent.includes("No teammates")) {
+            teamCountEl.textContent = "0";
+          } else {
+            teamCountEl.textContent = memberCards.length > 0 ? memberCards.length : "0";
+          }
+        }
+      }
+      
       // Logout handler
       document.getElementById("logoutBtn").addEventListener("click", () => {
         localStorage.removeItem("isLoggedIn");
@@ -79,6 +220,21 @@
         localStorage.removeItem("access_token");
         window.location.href = "login.html";
       });
+
+      // Watch for team members changes using MutationObserver
+      const teamMembersContainer = document.getElementById("teamMembers");
+      if (teamMembersContainer && window.MutationObserver) {
+        const observer = new MutationObserver(() => {
+          updateTeamCount();
+        });
+        observer.observe(teamMembersContainer, {
+          childList: true,
+          subtree: true
+        });
+      }
+      
+      // Initial count update (with delay to allow team.js to load)
+      setTimeout(updateTeamCount, 500);
     });
   </script>
 </body>

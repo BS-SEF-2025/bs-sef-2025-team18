@@ -23,12 +23,19 @@
 
     // Load criteria from /peer-reviews/form
     try {
+      // Add timeout to prevent hanging if backend is not running
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
       const formRes = await fetch(`${BACKEND_URL}/peer-reviews/form`, {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,
         },
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
       if (!formRes.ok) {
         throw new Error(`Failed to fetch criteria: HTTP ${formRes.status}`);
@@ -49,7 +56,11 @@
     } catch (e) {
       console.error("Failed to load criteria:", e);
       if (ratingContainer) {
-        ratingContainer.innerHTML = `<p class="error">Failed to load criteria: ${e.message}</p>`;
+        let errorMessage = e.message || "Unknown error";
+        if (e.name === 'AbortError') {
+          errorMessage = `Backend server not responding. Please ensure the backend is running on ${BACKEND_URL}`;
+        }
+        ratingContainer.innerHTML = `<p class="error">Failed to load criteria: ${errorMessage}</p>`;
       }
       return;
     }
@@ -166,7 +177,15 @@
     if (!commentBox || !commentCount) return;
 
     const length = commentBox.value.length;
-    commentCount.textContent = `${length}/500`;
+    
+    // Update the character count (support both old and new structure)
+    const charCountSpan = commentCount.querySelector('.char-count');
+    if (charCountSpan) {
+      charCountSpan.textContent = length;
+    } else {
+      // Fallback for old structure
+      commentCount.textContent = `${length}/500`;
+    }
     
     if (length > 450) {
       commentCount.classList.add("warning");

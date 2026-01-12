@@ -59,7 +59,6 @@ class SignupBody(BaseModel):
     @classmethod
     def validate_email(cls, v: str) -> str:
         v = v.strip()
-        # simple email check
         if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", v):
             raise ValueError("Invalid email format.")
         return v
@@ -77,17 +76,13 @@ class SignupBody(BaseModel):
 
 @auth_router.post("/signup", status_code=201)
 def signup(body: SignupBody):
-    # duplicate username
     if db.get_user_by_username(body.username):
         raise HTTPException(status_code=409, detail="Username already exists.")
-
-    # duplicate email
     if db.get_user_by_email(body.email):
         raise HTTPException(status_code=409, detail="Email already exists.")
 
     password_hash = hash_password(body.password)
     db.create_user(body.email, body.username, password_hash, body.role)
-
     return {"ok": True}
 
 
@@ -176,15 +171,11 @@ peer_review_router = APIRouter(prefix="/peer-reviews", tags=["peer-reviews"])
 
 @peer_review_router.get("/form")
 def get_peer_review_form(user=Depends(require_roles("student"))):
-    """
-    Returns teammates (all other students) + predefined evaluation criteria.
-    """
     teammates = db.get_student_teammates_except(user["username"])
     criteria = db.get_peer_review_criteria()
     return {"teammates": teammates, "criteria": criteria}
 
 
-# ---------- Validation Models ----------
 class AnswerIn(BaseModel):
     criterion_id: int
     rating: int
@@ -201,10 +192,6 @@ class SubmitPeerReviewBody(BaseModel):
 
 @peer_review_router.post("/submit")
 def submit_peer_review(body: SubmitPeerReviewBody, user=Depends(require_roles("student"))):
-    """
-    Validates that all required criteria are answered for each teammate
-    and ratings are within the allowed scale.
-    """
     teammates = db.get_student_teammates_except(user["username"])
     allowed_teammate_ids = {t["id"] for t in teammates}
 
@@ -259,7 +246,6 @@ def submit_peer_review(body: SubmitPeerReviewBody, user=Depends(require_roles("s
     if errors:
         raise HTTPException(status_code=400, detail=errors)
 
-    # Validation success (saving can be another subtask)
     return {"ok": True}
 
 
