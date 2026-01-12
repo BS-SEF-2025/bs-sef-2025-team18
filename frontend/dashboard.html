@@ -16,7 +16,7 @@
     <p id="who"></p>
     <button id="logout">Logout</button>
 
-    <!-- ✅ STEP 2: Team members section -->
+    <!-- Team members -->
     <hr />
     <h2>Team Members</h2>
 
@@ -44,6 +44,12 @@
     <button id="submitReviewBtn" type="button">Submit Review</button>
 
     <p id="teamError" class="error"></p>
+
+    <!-- Peer review -->
+    <hr />
+    <h2>Peer Review</h2>
+    <div id="peerReview"></div>
+    <p id="reviewError" class="error"></p>
   </main>
 
   <script>
@@ -55,11 +61,13 @@
       localStorage.removeItem("isLoggedIn");
       localStorage.removeItem("username");
       localStorage.removeItem("role");
+      localStorage.removeItem("access_token");
       window.location.href = "login.html";
     });
   </script>
 
-  <!-- ✅ STEP 2: load team logic -->
+  <!-- load logic -->
   <script src="team.js"></script>
+  <script src="rating.js"></script>
 </body>
 </html>
