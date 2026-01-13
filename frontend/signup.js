@@ -81,8 +81,30 @@ if (form) {
         console.log("Response body (first 500 chars):", responseText.substring(0, 500));
         console.log("Request URL was:", `${BACKEND_URL}/auth/signup`);
         
+        // Handle 404 Not Found immediately
+        if (res.status === 404) {
+          let errorMsg = `The endpoint ${BACKEND_URL}/auth/signup was not found. `;
+          errorMsg += "Please ensure the backend server is running. ";
+          errorMsg += "From the backend folder, run: python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000";
+          setMessage(errorMsg, "error");
+          setLoading(false);
+          return;
+        }
+        
         if (ct.includes("application/json") || responseText.trim().startsWith("{")) {
-          data = JSON.parse(responseText);
+          try {
+            data = JSON.parse(responseText);
+          } catch (jsonErr) {
+            console.error("JSON parse error:", jsonErr);
+            // If it looks like JSON but failed to parse, check if it's a "Not Found" message
+            if (responseText.includes("Not Found") || responseText.includes('"detail":"Not Found"')) {
+              setMessage(`The endpoint ${BACKEND_URL}/auth/signup was not found. Please ensure the backend is running.`, "error");
+            } else {
+              setMessage("Failed to parse server response. Please check backend.", "error");
+            }
+            setLoading(false);
+            return;
+          }
         } else {
           console.error("Non-JSON response received. Full response:", responseText);
           // Show more helpful error message
@@ -117,6 +139,7 @@ if (form) {
             body: JSON.stringify({ username, password }),
           });
 
+<<<<<<< Updated upstream
           // Parse login response properly
           const loginCt = loginRes.headers.get("content-type") || "";
           let loginData = null;
@@ -126,6 +149,20 @@ if (form) {
             console.log("Login response text:", loginResponseText);
             if (loginCt.includes("application/json") || loginResponseText.trim().startsWith("{")) {
               loginData = JSON.parse(loginResponseText);
+=======
+          if (loginRes.ok) {
+            const loginData = await loginRes.json();
+            if (loginData && loginData.access_token) {
+              // Save auth data
+              localStorage.setItem("access_token", loginData.access_token);
+              localStorage.setItem("role", loginData.role || role);
+              localStorage.setItem("isLoggedIn", "true");
+              localStorage.setItem("username", username);
+
+              // Redirect to dashboard immediately - no delay
+              window.location.href = "dashboard.html";
+              return;
+>>>>>>> Stashed changes
             }
           } catch (parseErr) {
             console.error("Failed to parse login response:", parseErr);
@@ -150,6 +187,7 @@ if (form) {
             return;
           }
           
+<<<<<<< Updated upstream
           // If auto-login fails, show error but still allow manual login
           console.error("Auto-login failed. Status:", loginRes.status, "Data:", loginData);
           setMessage("✓ Account created successfully! Please log in to continue.", "success");
@@ -166,6 +204,21 @@ if (form) {
           setTimeout(() => {
             window.location.href = "login.html";
           }, 2000);
+=======
+          // If auto-login fails, show error but still try to redirect
+          console.error("Auto-login failed, but account was created");
+          setMessage("Account created! Redirecting to login...", "success");
+          setTimeout(() => {
+            window.location.href = "login.html";
+          }, 1000);
+        } catch (loginErr) {
+          console.error("Auto-login error:", loginErr);
+          // If auto-login fails, redirect to login page
+          setMessage("Account created! Redirecting to login...", "success");
+          setTimeout(() => {
+            window.location.href = "login.html";
+          }, 1000);
+>>>>>>> Stashed changes
         }
         return;
       }
