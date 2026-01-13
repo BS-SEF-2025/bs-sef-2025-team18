@@ -131,42 +131,31 @@ if (form) {
         // Automatically log in the user after successful signup
         try {
           // Small delay to ensure user is fully created in database
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise(resolve => setTimeout(resolve, 200));
           
+          console.log("Attempting auto-login for:", username);
           const loginRes = await fetch(`${BACKEND_URL}/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ username, password }),
           });
 
-<<<<<<< Updated upstream
           // Parse login response properly
           const loginCt = loginRes.headers.get("content-type") || "";
           let loginData = null;
           
           try {
             const loginResponseText = await loginRes.text();
+            console.log("Login response status:", loginRes.status);
             console.log("Login response text:", loginResponseText);
+            
             if (loginCt.includes("application/json") || loginResponseText.trim().startsWith("{")) {
               loginData = JSON.parse(loginResponseText);
-=======
-          if (loginRes.ok) {
-            const loginData = await loginRes.json();
-            if (loginData && loginData.access_token) {
-              // Save auth data
-              localStorage.setItem("access_token", loginData.access_token);
-              localStorage.setItem("role", loginData.role || role);
-              localStorage.setItem("isLoggedIn", "true");
-              localStorage.setItem("username", username);
-
-              // Redirect to dashboard immediately - no delay
-              window.location.href = "dashboard.html";
-              return;
->>>>>>> Stashed changes
+            } else {
+              console.error("Non-JSON login response:", loginResponseText);
             }
           } catch (parseErr) {
             console.error("Failed to parse login response:", parseErr);
-            console.error("Response text that failed to parse:", loginResponseText);
           }
 
           if (loginRes.ok && loginData && loginData.access_token) {
@@ -176,7 +165,7 @@ if (form) {
             localStorage.setItem("isLoggedIn", "true");
             localStorage.setItem("username", username);
 
-            // Show confirmation message and redirect immediately to dashboard
+            // Show confirmation message and redirect to dashboard
             setMessage("✓ Account created successfully! Redirecting...", "success");
             setLoading(false);
             
@@ -187,7 +176,6 @@ if (form) {
             return;
           }
           
-<<<<<<< Updated upstream
           // If auto-login fails, show error but still allow manual login
           console.error("Auto-login failed. Status:", loginRes.status, "Data:", loginData);
           setMessage("✓ Account created successfully! Please log in to continue.", "success");
@@ -204,21 +192,6 @@ if (form) {
           setTimeout(() => {
             window.location.href = "login.html";
           }, 2000);
-=======
-          // If auto-login fails, show error but still try to redirect
-          console.error("Auto-login failed, but account was created");
-          setMessage("Account created! Redirecting to login...", "success");
-          setTimeout(() => {
-            window.location.href = "login.html";
-          }, 1000);
-        } catch (loginErr) {
-          console.error("Auto-login error:", loginErr);
-          // If auto-login fails, redirect to login page
-          setMessage("Account created! Redirecting to login...", "success");
-          setTimeout(() => {
-            window.location.href = "login.html";
-          }, 1000);
->>>>>>> Stashed changes
         }
         return;
       }
