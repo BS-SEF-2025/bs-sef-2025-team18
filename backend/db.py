@@ -70,10 +70,52 @@ def init_db() -> None:
                 title TEXT NOT NULL,
                 required INTEGER NOT NULL DEFAULT 1,
                 scale_min INTEGER NOT NULL DEFAULT 1,
-                scale_max INTEGER NOT NULL DEFAULT 5
+                scale_max INTEGER NOT NULL DEFAULT 5,
+                weight REAL NOT NULL DEFAULT 1.0
             );
             """
         )
+
+        # ✅ Peer review submissions (stores individual reviews)
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS peer_review_submissions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                reviewer_id INTEGER NOT NULL,
+                reviewee_id INTEGER NOT NULL,
+                criterion_id INTEGER NOT NULL,
+                rating INTEGER NOT NULL,
+                submitted_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (reviewer_id) REFERENCES users(id),
+                FOREIGN KEY (reviewee_id) REFERENCES users(id),
+                FOREIGN KEY (criterion_id) REFERENCES peer_review_criteria(id),
+                UNIQUE(reviewer_id, reviewee_id, criterion_id)
+            );
+            """
+        )
+        # Create unique index for conflict resolution
+        conn.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_peer_review_unique 
+            ON peer_review_submissions(reviewer_id, reviewee_id, criterion_id);
+            """
+        )
+
+        # ✅ Results publication status
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS peer_review_results_published (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                published_at TEXT NOT NULL DEFAULT (datetime('now')),
+                published_by INTEGER NOT NULL,
+                FOREIGN KEY (published_by) REFERENCES users(id)
+            );
+            """
+        )
+
+        # Migration: Add weight column to criteria if it doesn't exist
+        if not _column_exists(conn, "peer_review_criteria", "weight"):
+            conn.execute("ALTER TABLE peer_review_criteria ADD COLUMN weight REAL NOT NULL DEFAULT 1.0;")
 
 
 def create_user(email: str, username: str, password_hash: str, role: str) -> None:
@@ -135,11 +177,25 @@ def get_student_teammates_except(username: str):
     return [{"id": r["id"], "username": r["username"]} for r in rows]
 
 
+def get_all_students():
+    """Get all students (for instructors)."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, username, email
+            FROM users
+            WHERE role = 'student'
+            ORDER BY username
+            """
+        ).fetchall()
+    return [{"id": r["id"], "username": r["username"], "email": r["email"]} for r in rows]
+
+
 def get_peer_review_criteria():
     with get_conn() as conn:
         rows = conn.execute(
             """
-            SELECT id, title, required, scale_min, scale_max
+            SELECT id, title, required, scale_min, scale_max, weight
             FROM peer_review_criteria
             ORDER BY id
             """
@@ -151,6 +207,7 @@ def get_peer_review_criteria():
             "title": r["title"],
             "required": bool(r["required"]),
             "scale": {"min": r["scale_min"], "max": r["scale_max"]},
+            "weight": float(r["weight"]) if "weight" in r.keys() else 1.0,
         }
         for r in rows
     ]
@@ -166,8 +223,126 @@ def insert_peer_review_criteria(title: str, required: int, scale_min: int, scale
     with get_conn() as conn:
         conn.execute(
             """
-            INSERT INTO peer_review_criteria (title, required, scale_min, scale_max)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO peer_review_criteria (title, required, scale_min, scale_max, weight)
+            VALUES (?, ?, ?, ?, 1.0)
             """,
             (title, required, scale_min, scale_max),
         )
+
+
+# =========================
+# Peer Review Submissions
+# =========================
+def save_peer_review_submission(reviewer_id: int, reviewee_id: int, criterion_id: int, rating: int) -> None:
+    """Save or update a peer review submission."""
+    with get_conn() as conn:
+        # Check if review already exists
+        existing = conn.execute(
+            """
+            SELECT id FROM peer_review_submissions
+            WHERE reviewer_id = ? AND reviewee_id = ? AND criterion_id = ?
+            """,
+            (reviewer_id, reviewee_id, criterion_id),
+        ).fetchone()
+        
+        if existing:
+            # Update existing review
+            conn.execute(
+                """
+                UPDATE peer_review_submissions
+                SET rating = ?, submitted_at = datetime('now')
+                WHERE reviewer_id = ? AND reviewee_id = ? AND criterion_id = ?
+                """,
+                (rating, reviewer_id, reviewee_id, criterion_id),
+            )
+        else:
+            # Insert new review
+            conn.execute(
+                """
+                INSERT INTO peer_review_submissions (reviewer_id, reviewee_id, criterion_id, rating)
+                VALUES (?, ?, ?, ?)
+                """,
+                (reviewer_id, reviewee_id, criterion_id, rating),
+            )
+
+
+def get_peer_reviews_for_student(student_id: int) -> list[dict]:
+    """Get all peer reviews received by a student."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT 
+                prs.reviewer_id,
+                u.username as reviewer_username,
+                prs.reviewee_id,
+                prs.criterion_id,
+                prc.title as criterion_title,
+                prc.weight as criterion_weight,
+                prc.scale_min,
+                prc.scale_max,
+                prs.rating,
+                prs.submitted_at
+            FROM peer_review_submissions prs
+            JOIN users u ON prs.reviewer_id = u.id
+            JOIN peer_review_criteria prc ON prs.criterion_id = prc.id
+            WHERE prs.reviewee_id = ?
+            ORDER BY prs.submitted_at DESC
+            """,
+            (student_id,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def get_reviews_submitted_by_reviewer_for_reviewee(reviewer_id: int, reviewee_id: int) -> list[dict]:
+    """Get all reviews submitted by a reviewer for a specific reviewee (for editing)."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT 
+                prs.criterion_id,
+                prs.rating,
+                prs.submitted_at
+            FROM peer_review_submissions prs
+            WHERE prs.reviewer_id = ? AND prs.reviewee_id = ?
+            ORDER BY prs.criterion_id
+            """,
+            (reviewer_id, reviewee_id),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def are_results_published() -> bool:
+    """Check if peer review results have been published."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS c FROM peer_review_results_published"
+        ).fetchone()
+        return int(row["c"]) > 0 if row else False
+
+
+def publish_results(published_by: int) -> None:
+    """Publish peer review results (only if not already published)."""
+    with get_conn() as conn:
+        # Check if already published
+        existing = conn.execute(
+            "SELECT COUNT(*) AS c FROM peer_review_results_published"
+        ).fetchone()
+        if existing and int(existing["c"]) > 0:
+            return  # Already published
+        
+        # Insert the publication record
+        conn.execute(
+            "INSERT INTO peer_review_results_published (published_by) VALUES (?)",
+            (published_by,),
+        )
+        # Commit is handled by the context manager
+
+
+def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
+    """Get user by ID."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT id, email, username, password_hash, role, created_at FROM users WHERE id=?",
+            (user_id,),
+        ).fetchone()
+        return dict(row) if row else None

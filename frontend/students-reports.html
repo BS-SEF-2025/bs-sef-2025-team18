@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>All Students Reports - PeerEval Pro</title>
+
+  <!-- Define global BACKEND_URL before any scripts -->
+  <script>
+    window.BACKEND_URL = "http://127.0.0.1:8000";
+  </script>
+
+  <!-- Page protection -->
+  <script src="protected.js"></script>
+</head>
+<body class="dashboard-body">
+  <!-- Top Navigation Bar -->
+  <nav class="dashboard-nav">
+    <div class="nav-brand">
+      <span class="brand-icon">📊</span>
+      <span class="brand-text">PeerEval Pro</span>
+    </div>
+    <div class="nav-user">
+      <div class="user-profile">
+        <div class="user-avatar">
+          <span id="userInitial">U</span>
+        </div>
+        <div class="user-details">
+          <span class="user-name" id="userNameDisplay">User</span>
+          <span class="user-role" id="userRoleDisplay">Instructor</span>
+        </div>
+      </div>
+      <div style="display: flex; gap: 12px;">
+        <a href="dashboard.html" class="logout-btn-nav" style="text-decoration: none; display: flex; align-items: center; gap: 8px;">
+          <span>🏠</span>
+          <span>Dashboard</span>
+        </a>
+        <button id="logoutBtn" class="logout-btn-nav">
+          <span>🚪</span>
+          <span>Logout</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Dashboard Container -->
+  <div class="dashboard-container">
+    <!-- Welcome Header -->
+    <div class="dashboard-welcome">
+      <h1 id="welcomeText">All Students Reports</h1>
+      <p class="welcome-subtitle">View and access detailed peer review reports for all students</p>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="dashboard-card" style="display: none; text-align: center; padding: 40px;">
+      <div class="report-loading-spinner" style="margin: 0 auto 16px;"></div>
+      <p>Loading students reports...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="errorState" class="dashboard-card" style="display: none; text-align: center; padding: 40px;">
+      <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+      <p id="errorMessage" class="error"></p>
+      <button onclick="loadStudentsReports()" class="submit-btn-primary" style="margin-top: 16px;">
+        <span class="btn-icon">🔄</span>
+        <span>Retry</span>
+      </button>
+    </div>
+
+    <!-- Students Reports Grid -->
+    <div id="studentsReportsContainer" style="display: none;">
+      <div id="studentsReportsGrid" class="students-reports-grid"></div>
+      <div id="noStudentsMessage" style="display: none; text-align: center; padding: 40px; color: #6b7280;">
+        <p>No students found in the system.</p>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .students-reports-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    .student-report-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 24px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      color: inherit;
+      display: block;
+    }
+
+    .student-report-card:hover {
+      border-color: #667eea;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+      transform: translateY(-2px);
+    }
+
+    .student-report-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: 16px;
+    }
+
+    .student-report-card-name {
+      font-size: 18px;
+      font-weight: 600;
+      color: #1e293b;
+      margin: 0;
+    }
+
+    .student-report-card-status {
+      font-size: 12px;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-weight: 500;
+    }
+
+    .status-has-report {
+      background: #ecfdf5;
+      color: #059669;
+    }
+
+    .status-no-report {
+      background: #f3f4f6;
+      color: #6b7280;
+    }
+
+    .student-report-card-score {
+      text-align: center;
+      margin: 20px 0;
+    }
+
+    .student-report-card-score-value {
+      font-size: 48px;
+      font-weight: bold;
+      margin: 8px 0;
+    }
+
+    .student-report-card-score-label {
+      font-size: 14px;
+      color: #64748b;
+    }
+
+    .student-report-card-stats {
+      display: flex;
+      justify-content: space-around;
+      padding-top: 16px;
+      border-top: 1px solid #e2e8f0;
+      margin-top: 16px;
+    }
+
+    .student-report-card-stat {
+      text-align: center;
+    }
+
+    .student-report-card-stat-value {
+      font-size: 20px;
+      font-weight: 600;
+      color: #1e293b;
+    }
+
+    .student-report-card-stat-label {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 4px;
+    }
+
+    .student-report-card-no-data {
+      text-align: center;
+      padding: 20px;
+      color: #94a3b8;
+      font-size: 14px;
+    }
+  </style>
+
+  <script>
+    const BACKEND_URL = window.BACKEND_URL;
+
+    // Initialize page
+    document.addEventListener("DOMContentLoaded", () => {
+      const username = localStorage.getItem("username") || "User";
+      const role = localStorage.getItem("role") || "instructor";
+      
+      // Check if user is instructor
+      if (role !== "instructor") {
+        window.location.href = "dashboard.html";
+        return;
+      }
+      
+      // Update user profile
+      const userNameDisplay = document.getElementById("userNameDisplay");
+      const userRoleDisplay = document.getElementById("userRoleDisplay");
+      const userInitial = document.getElementById("userInitial");
+      
+      if (userNameDisplay) userNameDisplay.textContent = username;
+      if (userRoleDisplay) userRoleDisplay.textContent = "Instructor";
+      if (userInitial) userInitial.textContent = username.charAt(0).toUpperCase();
+
+      // Logout handler
+      document.getElementById("logoutBtn").addEventListener("click", () => {
+        localStorage.removeItem("isLoggedIn");
+        localStorage.removeItem("username");
+        localStorage.removeItem("role");
+        localStorage.removeItem("access_token");
+        window.location.href = "login.html";
+      });
+
+      // Load students reports
+      loadStudentsReports();
+    });
+
+    async function loadStudentsReports() {
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        showError("You are not logged in.");
+        return;
+      }
+
+      const loadingState = document.getElementById("loadingState");
+      const errorState = document.getElementById("errorState");
+      const container = document.getElementById("studentsReportsContainer");
+      const grid = document.getElementById("studentsReportsGrid");
+      const noStudentsMessage = document.getElementById("noStudentsMessage");
+
+      // Show loading, hide others
+      loadingState.style.display = "block";
+      errorState.style.display = "none";
+      container.style.display = "none";
+      noStudentsMessage.style.display = "none";
+
+      try {
+        // First, get all students
+        const studentsRes = await fetch(`${BACKEND_URL}/instructor/students`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
+        });
+
+        if (!studentsRes.ok) {
+          throw new Error(`Failed to load students (HTTP ${studentsRes.status})`);
+        }
+
+        const studentsData = await studentsRes.json();
+        const students = studentsData.students || [];
+
+        if (students.length === 0) {
+          loadingState.style.display = "none";
+          noStudentsMessage.style.display = "block";
+          return;
+        }
+
+        // Fetch report for each student
+        const reportPromises = students.map(async (student) => {
+          try {
+            const reportRes = await fetch(`${BACKEND_URL}/peer-reviews/report?student_id=${student.id}`, {
+              method: "GET",
+              headers: {
+                "Authorization": `Bearer ${token}`,
+              },
+            });
+
+            if (reportRes.ok) {
+              const reportData = await reportRes.json();
+              return {
+                student: student,
+                report: reportData,
+                hasReport: true,
+              };
+            } else {
+              // Student might not have a report yet
+              return {
+                student: student,
+                report: null,
+                hasReport: false,
+              };
+            }
+          } catch (err) {
+            console.error(`Error fetching report for student ${student.id}:`, err);
+            return {
+              student: student,
+              report: null,
+              hasReport: false,
+            };
+          }
+        });
+
+        const results = await Promise.all(reportPromises);
+
+        // Hide loading, show container
+        loadingState.style.display = "none";
+        container.style.display = "block";
+
+        // Clear grid
+        grid.innerHTML = "";
+
+        // Render student report cards
+        results.forEach((result) => {
+          const card = createStudentReportCard(result);
+          grid.appendChild(card);
+        });
+
+      } catch (err) {
+        console.error("Error loading students reports:", err);
+        showError(err.message || "Failed to load students reports. Please try again.");
+      }
+    }
+
+    function createStudentReportCard(result) {
+      const { student, report, hasReport } = result;
+
+      const card = document.createElement("a");
+      card.href = `report.html?student_id=${student.id}`;
+      card.className = "student-report-card";
+
+      const overallScore = report?.overall_score;
+      const totalReviews = report?.total_reviews || 0;
+      const uniqueReviewers = report?.unique_reviewers || 0;
+      const criterionScores = report?.criterion_scores || [];
+
+      // Determine score color
+      let scoreColor = "#6b7280";
+      if (overallScore !== null && overallScore !== undefined) {
+        if (overallScore >= 4) {
+          scoreColor = "#10b981";
+        } else if (overallScore >= 3) {
+          scoreColor = "#f59e0b";
+        } else {
+          scoreColor = "#ef4444";
+        }
+      }
+
+      card.innerHTML = `
+        <div class="student-report-card-header">
+          <h3 class="student-report-card-name">${student.username}</h3>
+          <span class="student-report-card-status ${hasReport ? 'status-has-report' : 'status-no-report'}">
+            ${hasReport ? '✓ Has Report' : 'No Report'}
+          </span>
+        </div>
+        ${hasReport && overallScore !== null && overallScore !== undefined ? `
+          <div class="student-report-card-score">
+            <div class="student-report-card-score-value" style="color: ${scoreColor};">
+              ${overallScore.toFixed(2)}
+            </div>
+            <div class="student-report-card-score-label">Overall Score</div>
+          </div>
+          <div class="student-report-card-stats">
+            <div class="student-report-card-stat">
+              <div class="student-report-card-stat-value">${totalReviews}</div>
+              <div class="student-report-card-stat-label">Reviews</div>
+            </div>
+            <div class="student-report-card-stat">
+              <div class="student-report-card-stat-value">${uniqueReviewers}</div>
+              <div class="student-report-card-stat-label">Reviewers</div>
+            </div>
+            <div class="student-report-card-stat">
+              <div class="student-report-card-stat-value">${criterionScores.length}</div>
+              <div class="student-report-card-stat-label">Criteria</div>
+            </div>
+          </div>
+        ` : `
+          <div class="student-report-card-no-data">
+            <p>No peer review data available yet.</p>
+            <p style="font-size: 12px; margin-top: 8px;">Click to view details</p>
+          </div>
+        `}
+      `;
+
+      return card;
+    }
+
+    function showError(message) {
+      const loadingState = document.getElementById("loadingState");
+      const errorState = document.getElementById("errorState");
+      const errorMessage = document.getElementById("errorMessage");
+      const container = document.getElementById("studentsReportsContainer");
+
+      loadingState.style.display = "none";
+      container.style.display = "none";
+      errorState.style.display = "block";
+      errorMessage.textContent = message;
+    }
+  </script>
+</body>
+</html>

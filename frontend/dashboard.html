@@ -87,8 +87,145 @@
         </div>
       </section>
 
+      <!-- Instructor Controls Card (only for instructors) -->
+      <section id="instructorControlsCard" class="dashboard-card" style="display: none;">
+        <div class="card-header">
+          <h2 class="card-title">
+            <span class="card-icon">👨‍🏫</span>
+            Instructor Controls
+          </h2>
+        </div>
+        <div class="card-body">
+          <div class="instructor-controls-content">
+            <p style="color: #64748b; margin-bottom: 24px;">
+              Monitor student submissions and publish results when ready.
+            </p>
+            
+            <!-- Submission Status -->
+            <div id="submissionStatusCard" class="submission-status-card" style="margin-bottom: 24px;">
+              <div class="submission-status-header">
+                <h3 style="font-size: 16px; font-weight: 600; color: #1e293b; margin: 0 0 12px 0;">
+                  Submission Status
+                </h3>
+              </div>
+              <div id="submissionStatusContent" class="submission-status-content">
+                <div style="text-align: center; padding: 20px; color: #64748b;">
+                  <div class="report-loading-spinner" style="margin: 0 auto 12px;"></div>
+                  <p style="margin: 0;">Loading submission status...</p>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Publish Status -->
+            <div id="publishStatus" class="publish-status" style="margin-bottom: 20px;">
+              <div class="publish-status-item">
+                <span class="publish-status-label">Publish Status:</span>
+                <span id="publishStatusText" class="publish-status-value">Checking...</span>
+              </div>
+            </div>
+            
+            <!-- Publish Button -->
+            <button id="publishResultsBtn" type="button" class="submit-btn-primary">
+              <span class="btn-icon">📢</span>
+              <span>Publish Results</span>
+            </button>
+            <div id="publishMessage" class="msg" aria-live="polite" style="margin-top: 16px;"></div>
+            
+            <!-- Student Reports Section -->
+            <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #e2e8f0;">
+              <h3 style="font-size: 16px; font-weight: 600; color: #1e293b; margin: 0 0 16px 0;">
+                Student Reports
+              </h3>
+              <div id="studentReportsList" class="student-reports-list">
+                <div style="text-align: center; padding: 20px; color: #64748b;">
+                  <div class="report-loading-spinner" style="margin: 0 auto 12px;"></div>
+                  <p style="margin: 0;">Loading student reports...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Peer Review Report Card (only for students) -->
+      <section id="studentReportCard" class="dashboard-card">
+        <div class="card-header">
+          <h2 class="card-title">
+            <span class="card-icon">📊</span>
+            Peer Review Report
+          </h2>
+        </div>
+        <div class="card-body">
+          <!-- Loading State -->
+          <div id="reportLoadingState" class="report-loading-state">
+            <div class="report-loading-spinner"></div>
+            <p>Loading report data...</p>
+          </div>
+
+          <!-- Error State -->
+          <div id="reportErrorState" class="report-error-state" style="display: none;">
+            <div class="report-error-icon">⚠️</div>
+            <p id="reportErrorMessage" class="error"></p>
+          </div>
+
+          <!-- Report Preview Content -->
+          <div id="reportPreviewContent" style="display: none;">
+            <!-- Overall Score Display -->
+            <div class="report-overall-score">
+              <div class="report-score-label">Overall Performance</div>
+              <div id="reportOverallScore" class="report-score-value">-</div>
+              <div class="report-score-scale">out of 5.0</div>
+            </div>
+
+            <!-- Quick Stats -->
+            <div class="report-stats-grid">
+              <div class="report-stat-item">
+                <div class="report-stat-icon">📝</div>
+                <div class="report-stat-content">
+                  <div id="reportTotalReviews" class="report-stat-value">0</div>
+                  <div class="report-stat-label">Total Reviews</div>
+                </div>
+              </div>
+              <div class="report-stat-item">
+                <div class="report-stat-icon">👥</div>
+                <div class="report-stat-content">
+                  <div id="reportUniqueReviewers" class="report-stat-value">0</div>
+                  <div class="report-stat-label">Reviewers</div>
+                </div>
+              </div>
+              <div class="report-stat-item">
+                <div class="report-stat-icon">📋</div>
+                <div class="report-stat-content">
+                  <div id="reportCriteriaCount" class="report-stat-value">0</div>
+                  <div class="report-stat-label">Criteria</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Top Criteria Preview -->
+            <div id="reportCriteriaPreview" class="report-criteria-preview"></div>
+          </div>
+
+          <!-- No Data State -->
+          <div id="reportNoDataState" class="report-no-data-state" style="display: none;">
+            <div class="report-no-data-icon">📊</div>
+            <p class="report-no-data-title" id="noDataTitle">No Report Data Available</p>
+            <p class="report-no-data-message" id="noDataMessage">Your peer review report will appear here once reviews are submitted and results are published.</p>
+            <div style="margin-top: 20px;">
+              <button id="refreshReportBtn" type="button" class="submit-btn-primary" style="max-width: 200px; margin: 0 auto; display: none;">
+                <span class="btn-icon">🔄</span>
+                <span>Refresh</span>
+              </button>
+              <p style="font-size: 12px; color: #94a3b8; margin-top: 12px; margin-bottom: 0;">
+                The page will automatically check for published results every 30 seconds.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- Submit Review Card -->
-      <section class="dashboard-card dashboard-card-wide review-card">
+      <section id="submitReviewCard" class="dashboard-card dashboard-card-wide review-card">
         <div class="card-header">
           <div class="card-header-content">
             <h2 class="card-title">
@@ -163,11 +300,60 @@
 
           <!-- Submit Section -->
           <div class="form-submit-section">
-            <button id="submitReviewBtn" type="button" class="submit-btn-primary">
+            <button id="confirmDetailsBtn" type="button" class="submit-btn-primary">
               <span class="btn-icon">✓</span>
-              <span>Submit Review</span>
+              <span>Confirm Details</span>
             </button>
             <div id="submitMessage" class="msg" aria-live="polite"></div>
+          </div>
+
+          <!-- Confirmation Review Section -->
+          <div id="confirmationSection" class="confirmation-section" style="display: none;">
+            <div class="confirmation-header">
+              <h3 class="confirmation-title">
+                <span class="confirmation-icon">📋</span>
+                Review Your Submission
+              </h3>
+              <p class="confirmation-subtitle">Please review your details before submitting</p>
+            </div>
+
+            <div class="confirmation-content">
+              <!-- Teammate Info -->
+              <div class="confirmation-item">
+                <div class="confirmation-label">Teammate:</div>
+                <div id="confirmationTeammate" class="confirmation-value">-</div>
+              </div>
+
+              <!-- Ratings Summary -->
+              <div class="confirmation-item">
+                <div class="confirmation-label">Ratings:</div>
+                <div id="confirmationRatings" class="confirmation-ratings-list"></div>
+              </div>
+
+              <!-- Comments -->
+              <div class="confirmation-item">
+                <div class="confirmation-label">Comments:</div>
+                <div id="confirmationComments" class="confirmation-value">
+                  <em style="color: #94a3b8;">No comments provided</em>
+                </div>
+              </div>
+            </div>
+
+            <!-- Confirmation Actions -->
+            <div class="confirmation-actions">
+              <button id="deleteSubmissionBtn" type="button" class="delete-btn-secondary">
+                <span class="btn-icon">🗑️</span>
+                <span>Delete</span>
+              </button>
+              <button id="editSubmissionBtn" type="button" class="edit-btn-secondary">
+                <span class="btn-icon">✏️</span>
+                <span>Edit</span>
+              </button>
+              <button id="submitReviewBtn" type="button" class="submit-btn-primary">
+                <span class="btn-icon">✓</span>
+                <span>Review</span>
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -235,7 +421,704 @@
       
       // Initial count update (with delay to allow team.js to load)
       setTimeout(updateTeamCount, 500);
+
+      // Show/hide content based on role
+      if (role === "instructor") {
+        // Hide student-specific content
+        document.getElementById("studentReportCard").style.display = "none";
+        document.getElementById("statsGrid").style.display = "none";
+        // Hide team members card (instructors don't have teammates)
+        const teamMembersCard = document.getElementById("teamMembersCard");
+        if (teamMembersCard) {
+          teamMembersCard.style.display = "none";
+        }
+        // Hide submit review card (instructors don't submit reviews)
+        const submitReviewCard = document.getElementById("submitReviewCard");
+        if (submitReviewCard) {
+          submitReviewCard.style.display = "none";
+        }
+        // Show instructor controls
+        document.getElementById("instructorControlsCard").style.display = "block";
+        // Load submission status, publish status, student reports and setup publish button
+        loadSubmissionStatus();
+        loadPublishStatus();
+        setupPublishButton();
+        // Load student reports with a small delay to ensure DOM is ready
+        setTimeout(() => {
+          loadStudentReports();
+        }, 100);
+      } else {
+        // Hide instructor controls
+        document.getElementById("instructorControlsCard").style.display = "none";
+        // Show student content
+        document.getElementById("studentReportCard").style.display = "block";
+        // Load peer review report preview
+        loadReportPreview();
+        
+        // Setup refresh button for report
+        const refreshReportBtn = document.getElementById("refreshReportBtn");
+        if (refreshReportBtn) {
+          refreshReportBtn.addEventListener("click", () => {
+            loadReportPreview();
+          });
+        }
+        
+        // Auto-refresh report preview every 30 seconds to check if results are published
+        // This allows students to see reports without manually refreshing after instructor publishes
+        if (role === "student") {
+          setInterval(() => {
+            // Only refresh if we're showing the "no data" state (results not published)
+            const noDataState = document.getElementById("reportNoDataState");
+            if (noDataState && noDataState.style.display !== "none") {
+              console.log("Auto-checking for published results...");
+              loadReportPreview();
+            }
+          }, 30000); // Check every 30 seconds
+        }
+      }
     });
+
+    // Load and display report preview (make it globally accessible)
+    window.loadReportPreview = async function loadReportPreview() {
+      const token = localStorage.getItem("access_token");
+      const role = localStorage.getItem("role") || "student";
+      
+      // Only load report for students (instructors can view reports on report.html)
+      if (role !== "student") {
+        document.getElementById("reportLoadingState").style.display = "none";
+        document.getElementById("reportNoDataState").style.display = "block";
+        return;
+      }
+
+      if (!token) {
+        hideReportLoading();
+        showReportError("You are not logged in.");
+        return;
+      }
+
+      const loadingState = document.getElementById("reportLoadingState");
+      const errorState = document.getElementById("reportErrorState");
+      const previewContent = document.getElementById("reportPreviewContent");
+      const noDataState = document.getElementById("reportNoDataState");
+
+      // Show loading state
+      loadingState.style.display = "block";
+      errorState.style.display = "none";
+      previewContent.style.display = "none";
+      noDataState.style.display = "none";
+
+      try {
+        const url = `${window.BACKEND_URL}/peer-reviews/report`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+        let res;
+        try {
+          res = await fetch(url, {
+            method: "GET",
+            headers: {
+              "Authorization": `Bearer ${token}`,
+            },
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          hideReportLoading();
+          
+          if (fetchError.name === 'AbortError') {
+            showReportError("Request timed out. Please try again later.");
+            return;
+          }
+          
+          if (fetchError.message && (fetchError.message.includes("Failed to fetch") || fetchError.message.includes("NetworkError"))) {
+            showReportError("Unable to connect to server. Please check your connection.");
+            return;
+          }
+          
+          showReportError("Failed to load report data.");
+          return;
+        }
+
+        // Handle response
+        if (!res.ok) {
+          hideReportLoading();
+          
+          if (res.status === 403) {
+            // Results not published yet - show no data state with helpful message
+            loadingState.style.display = "none";
+            errorState.style.display = "none";
+            previewContent.style.display = "none";
+            noDataState.style.display = "block";
+            
+            // Update the message to be more specific
+            const noDataTitle = document.getElementById("noDataTitle");
+            const noDataMessage = document.getElementById("noDataMessage");
+            if (noDataTitle) {
+              noDataTitle.textContent = "Results Not Published Yet";
+            }
+            if (noDataMessage) {
+              noDataMessage.textContent = "Your peer review report will appear here once the instructor publishes the results. The page will automatically refresh when results are available.";
+            }
+            
+            // Show refresh button
+            const refreshBtn = document.getElementById("refreshReportBtn");
+            if (refreshBtn) {
+              refreshBtn.style.display = "inline-flex";
+            }
+            return;
+          } else if (res.status === 401) {
+            showReportError("You are not logged in.");
+            localStorage.removeItem("access_token");
+            localStorage.removeItem("isLoggedIn");
+            return;
+          } else {
+            showReportError("Failed to load report data.");
+            return;
+          }
+        }
+
+        const data = await res.json();
+        
+        console.log("Report data received:", data);
+        
+        // Check if there's actual data - show report if we have any meaningful data
+        if (!data) {
+          hideReportLoading();
+          loadingState.style.display = "none";
+          errorState.style.display = "none";
+          previewContent.style.display = "none";
+            noDataState.style.display = "block";
+            
+            // Show refresh button
+            const refreshBtn = document.getElementById("refreshReportBtn");
+            if (refreshBtn) {
+              refreshBtn.style.display = "inline-flex";
+            }
+            return;
+          }
+
+        // Check if we have any reviews or scores to display
+        const hasReviews = data.total_reviews && data.total_reviews > 0;
+        const hasScores = data.criterion_scores && data.criterion_scores.length > 0;
+        const hasOverallScore = data.overall_score !== null && data.overall_score !== undefined;
+        
+        if (!hasReviews && !hasScores && !hasOverallScore) {
+          hideReportLoading();
+          loadingState.style.display = "none";
+          errorState.style.display = "none";
+          previewContent.style.display = "none";
+          noDataState.style.display = "block";
+          
+          // Show refresh button
+          const refreshBtn = document.getElementById("refreshReportBtn");
+          if (refreshBtn) {
+            refreshBtn.style.display = "inline-flex";
+          }
+          return;
+        }
+
+        // Display report preview
+        displayReportPreview(data);
+        
+        // Hide refresh button if report is showing
+        const refreshBtn = document.getElementById("refreshReportBtn");
+        if (refreshBtn) {
+          refreshBtn.style.display = "none";
+        }
+        
+      } catch (err) {
+        console.error("Error loading report preview:", err);
+        hideReportLoading();
+        showReportError("An error occurred while loading your report.");
+      }
+    }
+
+    function displayReportPreview(data) {
+      console.log("Displaying report preview with data:", data);
+      
+      const loadingState = document.getElementById("reportLoadingState");
+      const errorState = document.getElementById("reportErrorState");
+      const previewContent = document.getElementById("reportPreviewContent");
+      const noDataState = document.getElementById("reportNoDataState");
+
+      // Hide all states
+      loadingState.style.display = "none";
+      errorState.style.display = "none";
+      noDataState.style.display = "none";
+      
+      // Show preview content
+      previewContent.style.display = "block";
+      
+      console.log("Report preview content should now be visible");
+
+      // Display overall score
+      const overallScoreEl = document.getElementById("reportOverallScore");
+      if (data.overall_score !== null && data.overall_score !== undefined) {
+        overallScoreEl.textContent = data.overall_score.toFixed(2);
+        
+        // Color based on score
+        const score = data.overall_score;
+        if (score >= 4) {
+          overallScoreEl.style.color = "#10b981"; // green
+        } else if (score >= 3) {
+          overallScoreEl.style.color = "#f59e0b"; // amber
+        } else {
+          overallScoreEl.style.color = "#ef4444"; // red
+        }
+      } else {
+        overallScoreEl.textContent = "N/A";
+        overallScoreEl.style.color = "#6b7280";
+      }
+
+      // Display stats (handle undefined/null values)
+      const totalReviews = data.total_reviews !== undefined && data.total_reviews !== null ? data.total_reviews : 0;
+      const uniqueReviewers = data.unique_reviewers !== undefined && data.unique_reviewers !== null ? data.unique_reviewers : 0;
+      const criteriaCount = data.criterion_scores && Array.isArray(data.criterion_scores) ? data.criterion_scores.length : 0;
+      
+      document.getElementById("reportTotalReviews").textContent = totalReviews;
+      document.getElementById("reportUniqueReviewers").textContent = uniqueReviewers;
+      document.getElementById("reportCriteriaCount").textContent = criteriaCount;
+
+      // Display all criteria in a list format
+      const criteriaPreview = document.getElementById("reportCriteriaPreview");
+      if (data.criterion_scores && data.criterion_scores.length > 0) {
+        // Show all criteria, not just top 3
+        criteriaPreview.innerHTML = data.criterion_scores.map((criterion, index) => {
+          const score = criterion.average_score || 0;
+          const maxScore = 5;
+          const percentage = (score / maxScore) * 100;
+          
+          let scoreColor = "#6b7280";
+          if (score >= 4) {
+            scoreColor = "#10b981";
+          } else if (score >= 3) {
+            scoreColor = "#f59e0b";
+          } else {
+            scoreColor = "#ef4444";
+          }
+
+          return `
+            <div class="report-criterion-item">
+              <div class="report-criterion-header">
+                <span class="report-criterion-title">${criterion.criterion_title}</span>
+                <span class="report-criterion-score" style="color: ${scoreColor};">${score.toFixed(2)}</span>
+              </div>
+              <div class="report-criterion-bar">
+                <div class="report-criterion-bar-fill" style="width: ${percentage}%; background: ${scoreColor};"></div>
+              </div>
+            </div>
+          `;
+        }).join("");
+      } else {
+        // If no criteria scores but we have other data, show a message
+        criteriaPreview.innerHTML = '<p style="text-align: center; color: #64748b; padding: 16px;">No criterion scores available yet.</p>';
+      }
+    };
+
+    function hideReportLoading() {
+      document.getElementById("reportLoadingState").style.display = "none";
+    }
+
+    function showReportError(message) {
+      const loadingState = document.getElementById("reportLoadingState");
+      const errorState = document.getElementById("reportErrorState");
+      const previewContent = document.getElementById("reportPreviewContent");
+      const noDataState = document.getElementById("reportNoDataState");
+
+      loadingState.style.display = "none";
+      previewContent.style.display = "none";
+      noDataState.style.display = "none";
+      errorState.style.display = "block";
+      document.getElementById("reportErrorMessage").textContent = message;
+    }
+
+    // Instructor functions for viewing submissions and publishing results
+    async function loadSubmissionStatus() {
+      const token = localStorage.getItem("access_token");
+      if (!token) return;
+
+      const statusContent = document.getElementById("submissionStatusContent");
+      if (!statusContent) return;
+
+      try {
+        const res = await fetch(`${window.BACKEND_URL}/instructor/submissions`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) {
+          statusContent.innerHTML = `
+            <div style="text-align: center; padding: 20px; color: #ef4444;">
+              <p>Failed to load submission status.</p>
+            </div>
+          `;
+          return;
+        }
+
+        const data = await res.json();
+        const submissions = data.submissions || [];
+        const totalStudents = data.total_students || 0;
+        const completedCount = submissions.filter(s => s.is_complete).length;
+        const inProgressCount = submissions.filter(s => !s.is_complete && s.total_submissions > 0).length;
+        const notStartedCount = submissions.filter(s => s.total_submissions === 0).length;
+
+        // Build status display
+        let statusHTML = `
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px;">
+            <div style="padding: 16px; background: #ecfdf5; border-radius: 12px; border: 1px solid #a7f3d0;">
+              <div style="font-size: 24px; font-weight: 700; color: #059669; margin-bottom: 4px;">${completedCount}</div>
+              <div style="font-size: 12px; color: #047857; font-weight: 500;">Completed</div>
+            </div>
+            <div style="padding: 16px; background: #fef3c7; border-radius: 12px; border: 1px solid #fde68a;">
+              <div style="font-size: 24px; font-weight: 700; color: #d97706; margin-bottom: 4px;">${inProgressCount}</div>
+              <div style="font-size: 12px; color: #b45309; font-weight: 500;">In Progress</div>
+            </div>
+            <div style="padding: 16px; background: #f3f4f6; border-radius: 12px; border: 1px solid #d1d5db;">
+              <div style="font-size: 24px; font-weight: 700; color: #6b7280; margin-bottom: 4px;">${notStartedCount}</div>
+              <div style="font-size: 12px; color: #4b5563; font-weight: 500;">Not Started</div>
+            </div>
+          </div>
+        `;
+
+        // Show detailed list if there are submissions
+        if (submissions.length > 0) {
+          statusHTML += `
+            <div style="max-height: 300px; overflow-y: auto;">
+              <div style="font-size: 13px; font-weight: 600; color: #64748b; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
+                Student Submissions
+              </div>
+          `;
+
+          submissions.forEach(sub => {
+            const statusColor = sub.is_complete ? "#10b981" : (sub.total_submissions > 0 ? "#f59e0b" : "#6b7280");
+            const statusText = sub.is_complete ? "✓ Complete" : (sub.total_submissions > 0 ? "⏳ In Progress" : "○ Not Started");
+            
+            statusHTML += `
+              <div style="padding: 12px; margin-bottom: 8px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                  <span style="font-weight: 600; color: #1e293b; font-size: 14px;">${sub.username}</span>
+                  <span style="font-size: 12px; font-weight: 600; color: ${statusColor};">${statusText}</span>
+                </div>
+                <div style="font-size: 12px; color: #64748b;">
+                  ${sub.total_submissions} / ${sub.expected_submissions} submissions (${sub.submission_percentage}%)
+                </div>
+              </div>
+            `;
+          });
+
+          statusHTML += `</div>`;
+        }
+
+        statusContent.innerHTML = statusHTML;
+      } catch (err) {
+        console.error("Error loading submission status:", err);
+        statusContent.innerHTML = `
+          <div style="text-align: center; padding: 20px; color: #ef4444;">
+            <p>Error loading submission status. Please try again.</p>
+          </div>
+        `;
+      }
+    }
+
+    // Instructor functions for publishing results
+    async function loadPublishStatus() {
+      const token = localStorage.getItem("access_token");
+      if (!token) return;
+
+      try {
+        const res = await fetch(`${window.BACKEND_URL}/instructor/publish`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
+        });
+
+        const publishStatusText = document.getElementById("publishStatusText");
+        if (publishStatusText) {
+          if (res.ok) {
+            const data = await res.json();
+            if (data.published) {
+              publishStatusText.textContent = "Published";
+              publishStatusText.style.color = "#10b981";
+            } else {
+              publishStatusText.textContent = "Not Published";
+              publishStatusText.style.color = "#f59e0b";
+            }
+          } else {
+            publishStatusText.textContent = "Unknown";
+            publishStatusText.style.color = "#6b7280";
+          }
+        }
+      } catch (err) {
+        console.error("Error checking publish status:", err);
+        const publishStatusText = document.getElementById("publishStatusText");
+        if (publishStatusText) {
+          publishStatusText.textContent = "Error";
+          publishStatusText.style.color = "#ef4444";
+        }
+      }
+    }
+
+    function setupPublishButton() {
+      const publishBtn = document.getElementById("publishResultsBtn");
+      if (!publishBtn) return;
+
+      publishBtn.addEventListener("click", async () => {
+        const token = localStorage.getItem("access_token");
+        if (!token) {
+          setPublishMessage("You are not logged in.", "error");
+          return;
+        }
+
+        // Confirm before publishing
+        if (!confirm("Are you sure you want to publish the peer review results? This will make them visible to all students.")) {
+          return;
+        }
+
+        // Disable button
+        publishBtn.disabled = true;
+        const buttonText = publishBtn.querySelector("span:last-child");
+        const originalText = buttonText ? buttonText.textContent : "Publish Results";
+        if (buttonText) {
+          buttonText.textContent = "Publishing...";
+        }
+
+        try {
+          console.log("Publishing results...");
+          const res = await fetch(`${window.BACKEND_URL}/instructor/publish`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${token}`,
+            },
+          });
+
+          console.log("Publish response status:", res.status, res.statusText);
+
+          if (res.ok) {
+            const data = await res.json().catch(() => ({}));
+            console.log("Publish response data:", data);
+            
+            const successMsg = data.message || "✓ Results published successfully! Students can now view their reports.";
+            
+            if (data.already_published) {
+              setPublishMessage("Results are already published. Students can view their reports.", "info");
+            } else {
+              setPublishMessage(successMsg, "success");
+            }
+            
+            // Update status and refresh submission status and student reports
+            loadPublishStatus();
+            loadSubmissionStatus();
+            loadStudentReports();
+            
+            console.log("Results published successfully. Students should refresh their dashboard to see reports.");
+          } else {
+            const data = await res.json().catch(() => ({}));
+            const errorMsg = data.detail || `Failed to publish results (HTTP ${res.status})`;
+            setPublishMessage(errorMsg, "error");
+          }
+        } catch (err) {
+          console.error("Error publishing results:", err);
+          setPublishMessage("Network error: Failed to publish results. Please check your connection.", "error");
+        } finally {
+          publishBtn.disabled = false;
+          if (buttonText) {
+            buttonText.textContent = originalText;
+          }
+        }
+      });
+    }
+
+    function setPublishMessage(message, type) {
+      const msgEl = document.getElementById("publishMessage");
+      if (!msgEl) return;
+
+      msgEl.textContent = message;
+      msgEl.className = `msg ${type}`;
+      msgEl.style.display = message ? "block" : "none";
+
+      // Clear success messages after 5 seconds
+      if (type === "success") {
+        setTimeout(() => {
+          msgEl.textContent = "";
+          msgEl.style.display = "none";
+        }, 5000);
+      }
+    }
+
+    // Load and display student reports in instructor controls
+    async function loadStudentReports() {
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        console.error("No access token found for loading student reports");
+        return;
+      }
+
+      const reportsList = document.getElementById("studentReportsList");
+      if (!reportsList) {
+        console.error("studentReportsList element not found");
+        return;
+      }
+
+      console.log("Loading student reports...");
+
+      try {
+        // Get all students
+        const studentsRes = await fetch(`${window.BACKEND_URL}/instructor/students`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
+        });
+
+        if (!studentsRes.ok) {
+          const errorData = await studentsRes.json().catch(() => ({}));
+          console.error("Failed to load students:", studentsRes.status, errorData);
+          reportsList.innerHTML = `
+            <div style="text-align: center; padding: 20px; color: #ef4444;">
+              <p>Failed to load students (HTTP ${studentsRes.status}).</p>
+              <p style="font-size: 12px; margin-top: 8px;">${errorData.detail || 'Please check console for details'}</p>
+            </div>
+          `;
+          return;
+        }
+
+        const studentsData = await studentsRes.json();
+        const students = studentsData.students || [];
+
+        console.log(`Found ${students.length} students`);
+
+        if (students.length === 0) {
+          reportsList.innerHTML = `
+            <div style="text-align: center; padding: 20px; color: #64748b;">
+              <p>No students found.</p>
+            </div>
+          `;
+          return;
+        }
+
+        // Fetch report for each student
+        const reportPromises = students.map(async (student) => {
+          try {
+            const reportRes = await fetch(`${window.BACKEND_URL}/peer-reviews/report?student_id=${student.id}`, {
+              method: "GET",
+              headers: {
+                "Authorization": `Bearer ${token}`,
+              },
+            });
+
+            if (reportRes.ok) {
+              const reportData = await reportRes.json();
+              return {
+                student: student,
+                report: reportData,
+                hasReport: true,
+              };
+            } else {
+              return {
+                student: student,
+                report: null,
+                hasReport: false,
+              };
+            }
+          } catch (err) {
+            console.error(`Error fetching report for student ${student.id}:`, err);
+            return {
+              student: student,
+              report: null,
+              hasReport: false,
+            };
+          }
+        });
+
+        const results = await Promise.all(reportPromises);
+
+        // Build HTML for student reports list
+        let reportsHTML = '';
+        
+        if (results.length === 0) {
+          reportsHTML = `
+            <div style="text-align: center; padding: 20px; color: #64748b;">
+              <p>No students found.</p>
+            </div>
+          `;
+        } else {
+          // Filter to only show students with scores (hasReport and overallScore is not null/undefined)
+          const studentsWithScores = results.filter(result => {
+            return result.hasReport && 
+                   result.report && 
+                   result.report.overall_score !== null && 
+                   result.report.overall_score !== undefined;
+          });
+
+          if (studentsWithScores.length === 0) {
+            reportsHTML = `
+              <div style="text-align: center; padding: 20px; color: #64748b;">
+                <p>No students with scores available yet.</p>
+                <p style="font-size: 12px; margin-top: 8px;">Students will appear here once they receive peer reviews and results are published.</p>
+              </div>
+            `;
+          } else {
+            studentsWithScores.forEach((result) => {
+              const { student, report, hasReport } = result;
+              const overallScore = report?.overall_score;
+              const totalReviews = report?.total_reviews || 0;
+              const uniqueReviewers = report?.unique_reviewers || 0;
+
+              // Determine score color
+              let scoreColor = "#6b7280";
+              let scoreText = "N/A";
+              if (hasReport && overallScore !== null && overallScore !== undefined) {
+                scoreText = overallScore.toFixed(2);
+                if (overallScore >= 4) {
+                  scoreColor = "#10b981";
+                } else if (overallScore >= 3) {
+                  scoreColor = "#f59e0b";
+                } else {
+                  scoreColor = "#ef4444";
+                }
+              }
+
+              reportsHTML += `
+                <div class="student-report-item" style="padding: 16px; margin-bottom: 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="flex: 1;">
+                      <div style="font-weight: 600; color: #1e293b; font-size: 14px;">${student.username}</div>
+                    </div>
+                    <div style="text-align: right; margin-left: 16px;">
+                      <div style="font-size: 24px; font-weight: bold; color: ${scoreColor};">
+                        ${scoreText}
+                      </div>
+                      <div style="font-size: 10px; color: #64748b;">Score</div>
+                    </div>
+                  </div>
+                </div>
+              `;
+            });
+          }
+        }
+
+        reportsList.innerHTML = reportsHTML;
+        console.log("Student reports HTML updated");
+
+      } catch (err) {
+        console.error("Error loading student reports:", err);
+        console.error("Error details:", err.message, err.stack);
+        reportsList.innerHTML = `
+          <div style="text-align: center; padding: 20px; color: #ef4444;">
+            <p>Error loading student reports.</p>
+            <p style="font-size: 12px; margin-top: 8px; color: #64748b;">${err.message || 'Please check console for details'}</p>
+            <button onclick="loadStudentReports()" class="submit-btn-primary" style="margin-top: 12px; padding: 8px 16px; font-size: 14px;">
+              <span class="btn-icon">🔄</span>
+              <span>Retry</span>
+            </button>
+          </div>
+        `;
+      }
+    }
   </script>
 </body>
 </html>

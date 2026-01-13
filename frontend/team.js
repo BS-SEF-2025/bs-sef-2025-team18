@@ -4,6 +4,13 @@
   const BACKEND_URL = window.BACKEND_URL;
 
   document.addEventListener("DOMContentLoaded", async () => {
+    // Check if user is an instructor - they don't have teammates
+    const role = localStorage.getItem("role") || "student";
+    if (role === "instructor") {
+      // Instructors don't need team members, so skip loading
+      return;
+    }
+
     const container = document.getElementById("teamMembers");
     const teammateSelect = document.getElementById("teammateSelect");
     const errorEl = document.getElementById("teamError");
@@ -48,10 +55,18 @@
       console.error("Failed to load teammates:", e);
       if (errorEl) {
         let errorMessage = e.message || "Check backend logs.";
-        if (e.name === 'AbortError') {
-          errorMessage = `Backend server not responding. Please ensure the backend is running on ${BACKEND_URL}`;
+        if (e.name === 'AbortError' || e.message.includes('Failed to fetch') || e.message.includes('NetworkError')) {
+          errorMessage = `Backend server not responding. Please ensure the backend is running on ${BACKEND_URL}. Start it with: cd backend && uvicorn main:app --reload`;
+        } else if (e.message.includes('401') || e.message.includes('Unauthorized')) {
+          errorMessage = "Authentication failed. Please log in again.";
+          setTimeout(() => {
+            window.location.href = "login.html";
+          }, 2000);
+        } else if (e.message.includes('403') || e.message.includes('Forbidden')) {
+          errorMessage = "Access denied. You may not have the required permissions.";
         }
         errorEl.textContent = `Failed to load team members: ${errorMessage}`;
+        errorEl.className = "error";
       }
       return;
     }
