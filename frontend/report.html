@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>My Peer Review Report - PeerEval Pro</title>
+
+  <!-- Define global BACKEND_URL before any scripts -->
+  <script>
+    window.BACKEND_URL = "http://127.0.0.1:8000";
+  </script>
+
+  <!-- Page protection -->
+  <script src="protected.js"></script>
+</head>
+<body class="dashboard-body">
+  <!-- Top Navigation Bar -->
+  <nav class="dashboard-nav">
+    <div class="nav-brand">
+      <span class="brand-icon">📊</span>
+      <span class="brand-text">PeerEval Pro</span>
+    </div>
+    <div class="nav-user">
+      <div class="user-profile">
+        <div class="user-avatar">
+          <span id="userInitial">U</span>
+        </div>
+        <div class="user-details">
+          <span class="user-name" id="userNameDisplay">User</span>
+          <span class="user-role" id="userRoleDisplay">Student</span>
+        </div>
+      </div>
+      <div style="display: flex; gap: 12px;">
+        <a href="dashboard.html" class="logout-btn-nav" style="text-decoration: none; display: flex; align-items: center; gap: 8px;">
+          <span>🏠</span>
+          <span>Dashboard</span>
+        </a>
+        <button id="logoutBtn" class="logout-btn-nav">
+          <span>🚪</span>
+          <span>Logout</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Dashboard Container -->
+  <div class="dashboard-container">
+    <!-- Welcome Header -->
+    <div class="dashboard-welcome">
+      <h1 id="welcomeText">My Peer Review Report</h1>
+      <p class="welcome-subtitle">View your overall performance based on peer evaluations</p>
+    </div>
+
+    <!-- Back to All Reports Link (shown when coming from students-reports page) -->
+    <div id="backToReportsLink" style="display: none; margin-bottom: 16px;">
+      <a href="students-reports.html" style="display: inline-flex; align-items: center; gap: 8px; color: #667eea; text-decoration: none; font-weight: 500; padding: 8px 16px; border-radius: 8px; background: #f8fafc; border: 1px solid #e2e8f0;">
+        <span>←</span>
+        <span>Back to All Reports</span>
+      </a>
+    </div>
+
+    <!-- Student Selector for Instructors -->
+    <div id="studentSelectorContainer" class="dashboard-card" style="display: none; margin-bottom: 24px;">
+      <div class="card-header">
+        <h2 class="card-title">
+          <span class="card-icon">👥</span>
+          Select Student
+        </h2>
+      </div>
+      <div class="card-body">
+        <div class="form-input-wrapper">
+          <select id="studentSelect" class="form-select-enhanced">
+            <option value="">-- Select a student to view their report --</option>
+          </select>
+          <span class="input-icon">👤</span>
+        </div>
+        <div id="studentSelectMessage" class="msg" style="margin-top: 12px; display: none;"></div>
+      </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="dashboard-card" style="display: none; text-align: center; padding: 40px;">
+      <div style="font-size: 48px; margin-bottom: 16px;">⏳</div>
+      <p>Loading your report...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="errorState" class="dashboard-card" style="display: none; text-align: center; padding: 40px;">
+      <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+      <p id="errorMessage" class="error"></p>
+    </div>
+
+    <!-- Report Content -->
+    <div id="reportContent" style="display: none;">
+      <!-- Read-Only Notice for Instructors -->
+      <div id="readOnlyNotice" class="read-only-notice" style="display: none;">
+        <div class="read-only-icon">🔒</div>
+        <div class="read-only-text">
+          <strong>Read-Only View</strong>
+          <span>You are viewing this report in read-only mode. Reports cannot be edited.</span>
+        </div>
+      </div>
+
+      <!-- Overall Score Card -->
+      <div class="dashboard-card" style="margin-bottom: 24px;">
+        <div class="card-header">
+          <h2 class="card-title">
+            <span class="card-icon">⭐</span>
+            Overall Performance Score
+          </h2>
+        </div>
+        <div class="card-body" style="text-align: center; padding: 40px;">
+          <div id="overallScoreDisplay" style="font-size: 72px; font-weight: bold; color: #667eea; margin: 20px 0;">
+            -
+          </div>
+          <p style="color: #6b7280; font-size: 16px; margin-top: 8px;">
+            Weighted average across all evaluation criteria
+          </p>
+          <div id="reviewStats" style="margin-top: 24px; display: flex; justify-content: center; gap: 32px; flex-wrap: wrap;">
+            <div>
+              <div style="font-size: 24px; font-weight: 600; color: #1f2937;" id="totalReviewsCount">-</div>
+              <div style="color: #6b7280; font-size: 14px;">Total Reviews</div>
+            </div>
+            <div>
+              <div style="font-size: 24px; font-weight: 600; color: #1f2937;" id="uniqueReviewersCount">-</div>
+              <div style="color: #6b7280; font-size: 14px;">Reviewers</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Criterion Scores Card -->
+      <div class="dashboard-card">
+        <div class="card-header">
+          <h2 class="card-title">
+            <span class="card-icon">📋</span>
+            Scores by Evaluation Criterion
+          </h2>
+        </div>
+        <div class="card-body">
+          <div id="criterionScoresContainer"></div>
+          <div id="noCriterionScores" style="text-align: center; padding: 40px; color: #6b7280; display: none;">
+            No criterion scores available.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const BACKEND_URL = window.BACKEND_URL;
+
+    // Initialize page
+    document.addEventListener("DOMContentLoaded", () => {
+      const username = localStorage.getItem("username") || "User";
+      const role = localStorage.getItem("role") || "student";
+      
+      // Update welcome text
+      document.getElementById("welcomeText").textContent = `My Peer Review Report`;
+      
+      // Update user profile
+      const userNameDisplay = document.getElementById("userNameDisplay");
+      const userRoleDisplay = document.getElementById("userRoleDisplay");
+      const userInitial = document.getElementById("userInitial");
+      
+      if (userNameDisplay) userNameDisplay.textContent = username;
+      if (userRoleDisplay) userRoleDisplay.textContent = role.charAt(0).toUpperCase() + role.slice(1);
+      if (userInitial) userInitial.textContent = username.charAt(0).toUpperCase();
+
+      // Logout handler
+      document.getElementById("logoutBtn").addEventListener("click", () => {
+        localStorage.removeItem("isLoggedIn");
+        localStorage.removeItem("username");
+        localStorage.removeItem("role");
+        localStorage.removeItem("access_token");
+        window.location.href = "login.html";
+      });
+
+      // Allow both students and instructors to access reports
+      if (role !== "student" && role !== "instructor") {
+        showError("This page is only available for students and instructors.");
+        return;
+      }
+
+      // Update welcome text for instructors
+      if (role === "instructor") {
+        document.getElementById("welcomeText").textContent = "Peer Review Report (Read-Only)";
+        const subtitle = document.querySelector(".welcome-subtitle");
+        if (subtitle) {
+          subtitle.textContent = "View peer review reports for students. Reports are read-only and cannot be edited.";
+        }
+        
+        // Check for student_id in URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const studentIdFromUrl = urlParams.get('student_id');
+        
+        // Show back link if student_id is in URL (coming from students-reports page)
+        if (studentIdFromUrl) {
+          document.getElementById("backToReportsLink").style.display = "block";
+          document.getElementById("studentSelectorContainer").style.display = "none";
+        } else {
+          document.getElementById("backToReportsLink").style.display = "none";
+          document.getElementById("studentSelectorContainer").style.display = "block";
+        }
+        
+        // Hide loading state initially for instructors (they need to select a student first)
+        document.getElementById("loadingState").style.display = "none";
+        document.getElementById("errorState").style.display = "none";
+        document.getElementById("reportContent").style.display = "none";
+        
+        // Load students (needed for selector dropdown)
+        loadStudents().then(() => {
+          // If student_id is in URL, select it and load the report
+          if (studentIdFromUrl) {
+            const studentSelect = document.getElementById("studentSelect");
+            if (studentSelect) {
+              studentSelect.value = studentIdFromUrl;
+            }
+            loadReport(studentIdFromUrl);
+          }
+        });
+        
+        // Handle student selection change
+        document.getElementById("studentSelect").addEventListener("change", () => {
+          const studentId = document.getElementById("studentSelect").value;
+          if (studentId) {
+            loadReport(studentId);
+          } else {
+            // Hide report content when no student selected
+            document.getElementById("reportContent").style.display = "none";
+            document.getElementById("loadingState").style.display = "none";
+            document.getElementById("errorState").style.display = "none";
+          }
+        });
+      } else {
+        // For students, show loading state and load report
+        console.log("Loading report for student...");
+        const loadingState = document.getElementById("loadingState");
+        const errorState = document.getElementById("errorState");
+        const reportContent = document.getElementById("reportContent");
+        const studentSelector = document.getElementById("studentSelectorContainer");
+        const backLink = document.getElementById("backToReportsLink");
+        
+        if (loadingState) loadingState.style.display = "block";
+        if (errorState) errorState.style.display = "none";
+        if (reportContent) reportContent.style.display = "none";
+        if (studentSelector) studentSelector.style.display = "none";
+        if (backLink) backLink.style.display = "none";
+        
+        // Small delay to ensure DOM is ready
+        setTimeout(() => {
+          loadReport();
+        }, 100);
+      }
+    });
+
+    async function loadStudents() {
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        console.error("No access token found");
+        showError("You are not logged in.");
+        return Promise.resolve();
+      }
+
+      const studentSelect = document.getElementById("studentSelect");
+      if (!studentSelect) {
+        console.error("Student select element not found");
+        return Promise.resolve();
+      }
+
+      try {
+        const res = await fetch(`${BACKEND_URL}/instructor/students`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) {
+          console.error("Failed to load students:", res.status, res.statusText);
+          const errorData = await res.json().catch(() => ({}));
+          const errorMsg = errorData.detail || `Failed to load students (HTTP ${res.status})`;
+          
+          studentSelect.innerHTML = '<option value="">Error loading students</option>';
+          
+          // Show error message in the selector area
+          const messageEl = document.getElementById("studentSelectMessage");
+          if (messageEl) {
+            messageEl.textContent = errorMsg;
+            messageEl.className = "msg error";
+            messageEl.style.display = "block";
+          }
+          
+          return Promise.resolve();
+        }
+
+        const data = await res.json();
+        console.log("Students loaded:", data);
+        
+        studentSelect.innerHTML = '<option value="">-- Select a student to view their report --</option>';
+        
+        const messageEl = document.getElementById("studentSelectMessage");
+        
+        if (data.students && data.students.length > 0) {
+          data.students.forEach(student => {
+            const option = document.createElement("option");
+            option.value = student.id;
+            option.textContent = student.username || `Student ${student.id}`;
+            studentSelect.appendChild(option);
+          });
+          console.log(`Loaded ${data.students.length} students`);
+          
+          // Hide any previous messages
+          if (messageEl) {
+            messageEl.style.display = "none";
+            messageEl.textContent = "";
+          }
+        } else {
+          studentSelect.innerHTML = '<option value="">No students found</option>';
+          console.warn("No students found in response");
+          
+          // Show message
+          if (messageEl) {
+            messageEl.textContent = "No students found. Please ensure students are registered in the system.";
+            messageEl.className = "msg info";
+            messageEl.style.display = "block";
+          }
+        }
+        
+        return Promise.resolve();
+      } catch (err) {
+        console.error("Error loading students:", err);
+        studentSelect.innerHTML = '<option value="">Error loading students</option>';
+        
+        // Show error message in the selector area
+        const messageEl = document.getElementById("studentSelectMessage");
+        if (messageEl) {
+          messageEl.textContent = "Failed to load students. Please check your connection and try again.";
+          messageEl.className = "msg error";
+          messageEl.style.display = "block";
+        }
+        
+        return Promise.resolve();
+      }
+    }
+
+    async function loadReport(studentId = null) {
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        console.error("No access token found in localStorage");
+        hideLoading();
+        showError("You are not logged in.");
+        return;
+      }
+
+      const loadingState = document.getElementById("loadingState");
+      const errorState = document.getElementById("errorState");
+      const reportContent = document.getElementById("reportContent");
+
+      // Always start by showing loading and hiding other states
+      loadingState.style.display = "block";
+      errorState.style.display = "none";
+      reportContent.style.display = "none";
+
+      try {
+        // Build URL with student_id parameter for instructors
+        let url = `${BACKEND_URL}/peer-reviews/report`;
+        if (studentId) {
+          url += `?student_id=${studentId}`;
+        }
+
+        console.log("Fetching report from:", url);
+        console.log("Backend URL configured as:", BACKEND_URL);
+
+        // Add timeout to prevent hanging
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+        let res;
+        try {
+          res = await fetch(url, {
+            method: "GET",
+            headers: {
+              "Authorization": `Bearer ${token}`,
+            },
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          console.error("Fetch error:", fetchError);
+          console.error("Fetch error name:", fetchError.name);
+          console.error("Fetch error message:", fetchError.message);
+          
+          hideLoading();
+          
+          if (fetchError.name === 'AbortError') {
+            showError("Request timed out. The backend server may not be responding.");
+            return;
+          }
+          // Network errors (CORS, connection refused, etc.)
+          if (fetchError.message && (fetchError.message.includes("Failed to fetch") || fetchError.message.includes("NetworkError"))) {
+            showError(`Backend server not responding. Please ensure the backend is running on ${BACKEND_URL}. Check CORS configuration if needed.`);
+            return;
+          }
+          showError("Network error occurred. Please check your connection and try again.");
+          return;
+        }
+
+        console.log("Report fetch response status:", res.status, res.statusText);
+
+        // Parse response
+        let data = null;
+        let responseText = "";
+        
+        try {
+          responseText = await res.text();
+          console.log("Response text (first 500 chars):", responseText.substring(0, 500));
+          
+          // Try to parse as JSON if response is not empty
+          if (responseText.trim()) {
+            try {
+              data = JSON.parse(responseText);
+              console.log("Report data received:", data);
+            } catch (parseError) {
+              console.error("Failed to parse JSON:", parseError);
+              console.error("Response text:", responseText);
+              hideLoading();
+              showError(`Invalid JSON response from server: ${responseText.substring(0, 200)}`);
+              return;
+            }
+          }
+        } catch (textError) {
+          console.error("Failed to read response text:", textError);
+          hideLoading();
+          showError("Failed to read response from server.");
+          return;
+        }
+
+        // Handle HTTP error status codes
+        if (!res.ok) {
+          hideLoading();
+          
+          // Handle specific status codes with user-friendly messages
+          let errorMessage = "Failed to load your peer review report.";
+          
+          if (res.status === 409) {
+            errorMessage = "Results are not published yet.";
+            console.error("Report fetch failed: 409 - Results not published", data);
+          } else if (res.status === 401) {
+            errorMessage = "You are not logged in.";
+            console.error("Report fetch failed: 401 - Authentication required", data);
+            // Clear invalid token
+            localStorage.removeItem("access_token");
+            localStorage.removeItem("isLoggedIn");
+          } else if (res.status === 403) {
+            // Check if it's the "not published" message
+            if (data && data.detail && (data.detail.toLowerCase().includes("not been published") || data.detail.toLowerCase().includes("not published"))) {
+              errorMessage = "Results are not published yet.";
+            } else {
+              errorMessage = "Access denied.";
+            }
+            console.error("Report fetch failed: 403 - Access denied", data);
+          } else if (res.status === 404) {
+            errorMessage = "Report endpoint not found (wrong URL).";
+            console.error("Report fetch failed: 404 - Endpoint not found. URL was:", url, "Response:", data);
+          } else {
+            // Generic error message for other status codes
+            errorMessage = data && data.detail ? data.detail : `Failed to load report (HTTP ${res.status})`;
+            console.error(`Report fetch failed: ${res.status} - ${res.statusText}`, data);
+          }
+          
+          showError(errorMessage);
+          return;
+        }
+
+        // Check if selection is required (for instructors)
+        if (data && data.requires_selection) {
+          hideLoading();
+          reportContent.style.display = "none";
+          errorState.style.display = "none";
+          // Don't show error, just keep selector visible
+          return;
+        }
+
+        // Check if we have valid data
+        if (!data) {
+          hideLoading();
+          showError("No report data received from server.");
+          return;
+        }
+
+        // Success: Hide loading, show content
+        hideLoading();
+        errorState.style.display = "none";
+        reportContent.style.display = "block";
+
+        // Show read-only notice for instructors
+        const role = localStorage.getItem("role") || "student";
+        const readOnlyNotice = document.getElementById("readOnlyNotice");
+        if (role === "instructor" && readOnlyNotice) {
+          readOnlyNotice.style.display = "flex";
+        } else if (readOnlyNotice) {
+          readOnlyNotice.style.display = "none";
+        }
+
+        console.log("Displaying report content");
+        // Display report data with error handling
+        try {
+          displayReport(data);
+        } catch (displayError) {
+          console.error("Error in displayReport:", displayError);
+          console.error("Display error stack:", displayError.stack);
+          // Hide report content and show error
+          reportContent.style.display = "none";
+          showError("Failed to display report data. Please check the console for details.");
+        }
+
+      } catch (err) {
+        console.error("Error loading report:", err);
+        console.error("Error name:", err.name);
+        console.error("Error message:", err.message);
+        if (err.stack) {
+          console.error("Error stack:", err.stack);
+        }
+        
+        // Always hide loading state on error
+        hideLoading();
+        
+        // Provide user-friendly error messages
+        let errorMessage = err.message || "Failed to load your peer review report. Please try again later.";
+        
+        if (err.message && (err.message.includes("Failed to fetch") || err.message.includes("NetworkError"))) {
+          errorMessage = `Backend server not responding. Please ensure the backend is running on ${BACKEND_URL}. Check CORS configuration if needed.`;
+        } else if (err.message && err.message.includes("timed out")) {
+          errorMessage = "Request timed out. The backend server may not be responding. Please check if the backend is running.";
+        } else if (err.message && (err.message.includes("Unexpected token") || err.message.includes("Invalid JSON"))) {
+          errorMessage = "Received invalid response from server. Please check backend logs.";
+        } else if (err.name === 'AbortError') {
+          errorMessage = "Request was cancelled or timed out. Please try again.";
+        }
+        
+        showError(errorMessage);
+      }
+    }
+
+    // Helper function to always hide loading state
+    function hideLoading() {
+      const loadingState = document.getElementById("loadingState");
+      if (loadingState) {
+        loadingState.style.display = "none";
+      }
+    }
+
+    function displayReport(data) {
+      // Ensure data exists
+      if (!data) {
+        console.error("No data provided to displayReport");
+        showError("No report data available.");
+        return;
+      }
+
+      console.log("displayReport called with data:", data);
+
+      // Check if there's a message indicating no reviews
+      if (data.message && data.message.includes("No peer reviews")) {
+        // Still show the report structure, but with no data message
+        const overallScoreDisplay = document.getElementById("overallScoreDisplay");
+        if (overallScoreDisplay) {
+          overallScoreDisplay.textContent = "N/A";
+          overallScoreDisplay.style.color = "#6b7280";
+        }
+        
+        const totalReviewsEl = document.getElementById("totalReviewsCount");
+        const uniqueReviewersEl = document.getElementById("uniqueReviewersCount");
+        if (totalReviewsEl) totalReviewsEl.textContent = "0";
+        if (uniqueReviewersEl) uniqueReviewersEl.textContent = "0";
+        
+        const container = document.getElementById("criterionScoresContainer");
+        const noScores = document.getElementById("noCriterionScores");
+        if (container) container.innerHTML = "";
+        if (noScores) {
+          noScores.textContent = data.message || "No peer reviews received yet.";
+          noScores.style.display = "block";
+        }
+        return;
+      }
+
+      // Overall score
+      const overallScoreDisplay = document.getElementById("overallScoreDisplay");
+      if (overallScoreDisplay) {
+        if (data.overall_score !== null && data.overall_score !== undefined) {
+          overallScoreDisplay.textContent = data.overall_score.toFixed(2);
+          // Color based on score (assuming 1-5 scale)
+          const score = data.overall_score;
+          if (score >= 4) {
+            overallScoreDisplay.style.color = "#10b981"; // green
+          } else if (score >= 3) {
+            overallScoreDisplay.style.color = "#f59e0b"; // amber
+          } else {
+            overallScoreDisplay.style.color = "#ef4444"; // red
+          }
+        } else {
+          overallScoreDisplay.textContent = "N/A";
+          overallScoreDisplay.style.color = "#6b7280";
+        }
+      }
+
+      // Stats
+      const totalReviewsEl = document.getElementById("totalReviewsCount");
+      const uniqueReviewersEl = document.getElementById("uniqueReviewersCount");
+      if (totalReviewsEl) {
+        totalReviewsEl.textContent = data.total_reviews || 0;
+      }
+      if (uniqueReviewersEl) {
+        uniqueReviewersEl.textContent = data.unique_reviewers || 0;
+      }
+
+      // Criterion scores
+      const container = document.getElementById("criterionScoresContainer");
+      const noScores = document.getElementById("noCriterionScores");
+
+      if (!data.criterion_scores || data.criterion_scores.length === 0) {
+        container.innerHTML = "";
+        noScores.style.display = "block";
+        // Don't return early - let the overall score and stats still display
+      } else {
+        noScores.style.display = "none";
+        container.innerHTML = "";
+
+        data.criterion_scores.forEach((criterion) => {
+        const criterionCard = document.createElement("div");
+        criterionCard.style.cssText = `
+          padding: 24px;
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          margin-bottom: 16px;
+          background: #ffffff;
+        `;
+
+        const score = criterion.average_score || 0;
+        const maxScore = 5; // Assuming max is 5, could be dynamic
+        const percentage = (score / maxScore) * 100;
+
+        // Color based on score
+        let scoreColor = "#6b7280";
+        if (score >= 4) {
+          scoreColor = "#10b981";
+        } else if (score >= 3) {
+          scoreColor = "#f59e0b";
+        } else {
+          scoreColor = "#ef4444";
+        }
+
+        criterionCard.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px;">
+            <div style="flex: 1;">
+              <h3 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600; color: #1f2937;">
+                ${criterion.criterion_title}
+              </h3>
+              <div style="display: flex; gap: 16px; font-size: 14px; color: #6b7280;">
+                <span>Weight: ${criterion.weight.toFixed(2)}</span>
+                <span>Reviews: ${criterion.review_count}</span>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 36px; font-weight: bold; color: ${scoreColor};">
+                ${score.toFixed(2)}
+              </div>
+              <div style="font-size: 12px; color: #6b7280;">out of ${maxScore}</div>
+            </div>
+          </div>
+          <div style="background: #f3f4f6; border-radius: 8px; height: 8px; overflow: hidden;">
+            <div style="background: linear-gradient(90deg, ${scoreColor} 0%, ${scoreColor}dd 100%); height: 100%; width: ${percentage}%; transition: width 0.3s ease;"></div>
+          </div>
+        `;
+
+        container.appendChild(criterionCard);
+        });
+      }
+    }
+
+    function showError(message) {
+      // Always hide loading state when showing error
+      hideLoading();
+      
+      const errorState = document.getElementById("errorState");
+      const reportContent = document.getElementById("reportContent");
+      const errorMessageEl = document.getElementById("errorMessage");
+
+      if (reportContent) {
+        reportContent.style.display = "none";
+      }
+      if (errorState) {
+        errorState.style.display = "block";
+      }
+      if (errorMessageEl) {
+        errorMessageEl.textContent = message;
+      }
+      
+      console.error("Showing error to user:", message);
+    }
+  </script>
+</body>
+</html>

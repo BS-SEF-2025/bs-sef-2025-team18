@@ -41,31 +41,127 @@
     return submittedReviews[teammateId] || null;
   }
 
-  function loadReviewIntoForm(teammateId) {
-    const review = getSubmittedReview(teammateId);
-    if (!review) return false;
+  async function loadReviewIntoForm(teammateId) {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      setSubmitMessage("Not authenticated. Please log in.", "error");
+      return false;
+    }
 
-    // Load ratings
-    if (review.answers) {
-      review.answers.forEach(answer => {
-        const input = document.querySelector(`input[name="rating-${answer.criterion_id}"][value="${answer.rating}"]`);
-        if (input) {
-          input.checked = true;
-        }
+    // Save current scroll position to prevent auto-scrolling
+    const scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
+
+    try {
+      // Try to load from backend first
+      const res = await fetch(`${BACKEND_URL}/peer-reviews/submitted/${teammateId}`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
       });
-    }
 
-    // Load comment
-    if (review.comment !== undefined) {
-      const commentBox = document.getElementById("commentBox");
-      if (commentBox) {
-        commentBox.value = review.comment || "";
-        updateCommentCounter();
+      if (res.ok) {
+        const data = await res.json();
+        if (data.submitted && data.answers && data.answers.length > 0) {
+          // Load ratings from backend without scrolling
+          data.answers.forEach(answer => {
+            const input = document.querySelector(`input[name="rating-${answer.criterion_id}"][value="${answer.rating}"]`);
+            if (input) {
+              // Prevent scrolling when checking radio buttons
+              input.checked = true;
+              // Remove focus to prevent scroll
+              if (document.activeElement === input) {
+                input.blur();
+              }
+            }
+          });
+
+          // Load comment from localStorage if available (comments aren't stored in backend)
+          const review = getSubmittedReview(teammateId);
+          if (review && review.comment !== undefined) {
+            const commentBox = document.getElementById("commentBox");
+            if (commentBox) {
+              commentBox.value = review.comment || "";
+              updateCommentCounter();
+              // Remove focus to prevent scroll
+              if (document.activeElement === commentBox) {
+                commentBox.blur();
+              }
+            }
+            commentsByTeammate[teammateId] = review.comment || "";
+          }
+
+          // Restore scroll position
+          window.scrollTo(0, scrollPosition);
+          return true;
+        }
+      } else if (res.status === 404) {
+        // No review found, try localStorage as fallback
+        const review = getSubmittedReview(teammateId);
+        if (review && review.answers) {
+          review.answers.forEach(answer => {
+            const input = document.querySelector(`input[name="rating-${answer.criterion_id}"][value="${answer.rating}"]`);
+            if (input) {
+              input.checked = true;
+              // Remove focus to prevent scroll
+              if (document.activeElement === input) {
+                input.blur();
+              }
+            }
+          });
+
+          if (review.comment !== undefined) {
+            const commentBox = document.getElementById("commentBox");
+            if (commentBox) {
+              commentBox.value = review.comment || "";
+              updateCommentCounter();
+              // Remove focus to prevent scroll
+              if (document.activeElement === commentBox) {
+                commentBox.blur();
+              }
+            }
+            commentsByTeammate[teammateId] = review.comment || "";
+          }
+          // Restore scroll position
+          window.scrollTo(0, scrollPosition);
+          return true;
+        }
       }
-      commentsByTeammate[teammateId] = review.comment || "";
+    } catch (e) {
+      console.error("Failed to load review from backend:", e);
+      // Fallback to localStorage
+      const review = getSubmittedReview(teammateId);
+      if (review && review.answers) {
+        review.answers.forEach(answer => {
+          const input = document.querySelector(`input[name="rating-${answer.criterion_id}"][value="${answer.rating}"]`);
+          if (input) {
+            input.checked = true;
+            // Remove focus to prevent scroll
+            if (document.activeElement === input) {
+              input.blur();
+            }
+          }
+        });
+
+        if (review.comment !== undefined) {
+          const commentBox = document.getElementById("commentBox");
+          if (commentBox) {
+            commentBox.value = review.comment || "";
+            updateCommentCounter();
+            // Remove focus to prevent scroll
+            if (document.activeElement === commentBox) {
+              commentBox.blur();
+            }
+          }
+          commentsByTeammate[teammateId] = review.comment || "";
+        }
+        // Restore scroll position
+        window.scrollTo(0, scrollPosition);
+        return true;
+      }
     }
 
-    return true;
+    return false;
   }
 
   function showEditButton(teammateId) {
@@ -85,10 +181,24 @@
     editBtn.className = "edit-btn-secondary";
     editBtn.innerHTML = '<span class="btn-icon">✏️</span><span>Edit Review</span>';
     
-    editBtn.addEventListener("click", () => {
-      if (loadReviewIntoForm(teammateId)) {
+    editBtn.addEventListener("click", async () => {
+      editBtn.disabled = true;
+      const buttonText = editBtn.querySelector("span:last-child");
+      if (buttonText) {
+        buttonText.textContent = "Loading...";
+      }
+      
+      const loaded = await loadReviewIntoForm(teammateId);
+      editBtn.disabled = false;
+      if (buttonText) {
+        buttonText.textContent = "Edit Review";
+      }
+      
+      if (loaded) {
         setSubmitMessage("Review loaded. You can now edit and resubmit.", "info");
         // Keep edit button visible so user can reload if needed
+      } else {
+        setSubmitMessage("No previously submitted review found for this teammate.", "error");
       }
     });
 
@@ -162,8 +272,15 @@
       console.error("Failed to load criteria:", e);
       if (ratingContainer) {
         let errorMessage = e.message || "Unknown error";
-        if (e.name === 'AbortError') {
-          errorMessage = `Backend server not responding. Please ensure the backend is running on ${BACKEND_URL}`;
+        if (e.name === 'AbortError' || e.message.includes('Failed to fetch') || e.message.includes('NetworkError')) {
+          errorMessage = `Backend server not responding. Please ensure the backend is running on ${BACKEND_URL}. Start it with: cd backend && uvicorn main:app --reload`;
+        } else if (e.message.includes('401') || e.message.includes('Unauthorized')) {
+          errorMessage = "Authentication failed. Please log in again.";
+          setTimeout(() => {
+            window.location.href = "login.html";
+          }, 2000);
+        } else if (e.message.includes('403') || e.message.includes('Forbidden')) {
+          errorMessage = "Access denied. You may not have the required permissions.";
         }
         ratingContainer.innerHTML = `<p class="error">Failed to load criteria: ${errorMessage}</p>`;
       }
@@ -172,8 +289,8 @@
 
     // Handle teammate selection change
     if (teammateSelect) {
-      teammateSelect.addEventListener("change", () => {
-        handleTeammateChange();
+      teammateSelect.addEventListener("change", async () => {
+        await handleTeammateChange();
       });
     }
 
@@ -181,10 +298,36 @@
     if (commentBox && commentCount) {
       commentBox.addEventListener("input", () => {
         updateCommentCounter();
+        // Hide confirmation if visible (user is editing)
+        hideConfirmation();
       });
     }
 
-    // Handle submit
+    // Handle confirm details button
+    const confirmDetailsBtn = document.getElementById("confirmDetailsBtn");
+    if (confirmDetailsBtn) {
+      confirmDetailsBtn.addEventListener("click", () => {
+        showConfirmation();
+      });
+    }
+
+    // Handle delete submission button
+    const deleteSubmissionBtn = document.getElementById("deleteSubmissionBtn");
+    if (deleteSubmissionBtn) {
+      deleteSubmissionBtn.addEventListener("click", () => {
+        deleteSubmission();
+      });
+    }
+
+    // Handle edit submission button
+    const editSubmissionBtn = document.getElementById("editSubmissionBtn");
+    if (editSubmissionBtn) {
+      editSubmissionBtn.addEventListener("click", () => {
+        hideConfirmation();
+      });
+    }
+
+    // Handle submit (after confirmation)
     if (submitReviewBtn) {
       submitReviewBtn.addEventListener("click", async () => {
         await handleSubmit();
@@ -250,13 +393,16 @@
     });
   }
 
-  function handleTeammateChange() {
+  async function handleTeammateChange() {
     const teammateSelect = document.getElementById("teammateSelect");
     const commentBox = document.getElementById("commentBox");
 
     if (!teammateSelect || !commentBox) return;
 
     const newId = teammateSelect.value;
+
+    // Save current scroll position to prevent auto-scrolling
+    const scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
 
     // Save previous teammate comment
     if (currentTeammateId) {
@@ -265,22 +411,87 @@
 
     currentTeammateId = newId || null;
 
-    // Hide edit button when switching teammates
+    // Hide edit button and confirmation section when switching teammates
     hideEditButton();
+    hideConfirmation();
 
-    // Check if there's a submitted review for this teammate
-    if (currentTeammateId && getSubmittedReview(currentTeammateId)) {
-      // Show edit button
-      showEditButton(currentTeammateId);
-      // Don't auto-load the review, let user click edit button
-      commentBox.value = "";
-    } else {
-      // Load new teammate comment (if any unsaved draft)
-      if (currentTeammateId && commentsByTeammate[currentTeammateId]) {
-        commentBox.value = commentsByTeammate[currentTeammateId];
+    // Check if there's a submitted review for this teammate (from backend or localStorage)
+    if (currentTeammateId) {
+      const token = localStorage.getItem("access_token");
+      if (token) {
+        try {
+          const res = await fetch(`${BACKEND_URL}/peer-reviews/submitted/${currentTeammateId}`, {
+            method: "GET",
+            headers: {
+              "Authorization": `Bearer ${token}`,
+            },
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            if (data.submitted && data.answers && data.answers.length > 0) {
+              // Show edit button and automatically load the review for editing
+              showEditButton(currentTeammateId);
+              // Automatically load the review into the form
+              await loadReviewIntoForm(currentTeammateId);
+            } else if (getSubmittedReview(currentTeammateId)) {
+              // Fallback to localStorage
+              showEditButton(currentTeammateId);
+              // Automatically load the review from localStorage
+              await loadReviewIntoForm(currentTeammateId);
+            } else {
+              // Load new teammate comment (if any unsaved draft)
+              if (commentsByTeammate[currentTeammateId]) {
+                commentBox.value = commentsByTeammate[currentTeammateId];
+              } else {
+                commentBox.value = "";
+              }
+            }
+          } else {
+            // Check localStorage as fallback
+            if (getSubmittedReview(currentTeammateId)) {
+              showEditButton(currentTeammateId);
+              // Automatically load the review from localStorage
+              await loadReviewIntoForm(currentTeammateId);
+            } else {
+              if (commentsByTeammate[currentTeammateId]) {
+                commentBox.value = commentsByTeammate[currentTeammateId];
+              } else {
+                commentBox.value = "";
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Failed to check for submitted review:", e);
+          // Fallback to localStorage
+          if (getSubmittedReview(currentTeammateId)) {
+            showEditButton(currentTeammateId);
+            // Automatically load the review from localStorage
+            await loadReviewIntoForm(currentTeammateId);
+          } else {
+            if (commentsByTeammate[currentTeammateId]) {
+              commentBox.value = commentsByTeammate[currentTeammateId];
+            } else {
+              commentBox.value = "";
+            }
+          }
+        }
       } else {
-        commentBox.value = "";
+        // No token, check localStorage only
+        if (getSubmittedReview(currentTeammateId)) {
+          showEditButton(currentTeammateId);
+          // Automatically load the review from localStorage
+          await loadReviewIntoForm(currentTeammateId);
+        } else {
+          if (commentsByTeammate[currentTeammateId]) {
+            commentBox.value = commentsByTeammate[currentTeammateId];
+          } else {
+            commentBox.value = "";
+          }
+        }
       }
+    } else {
+      commentBox.value = "";
     }
 
     // Clear rating inputs when switching teammates
@@ -289,6 +500,11 @@
     });
 
     updateCommentCounter();
+    
+    // Restore scroll position after all updates (use setTimeout to ensure DOM updates are complete)
+    setTimeout(() => {
+      window.scrollTo(0, scrollPosition);
+    }, 0);
   }
 
   function updateCommentCounter() {
@@ -508,6 +724,8 @@
             if (errorMsg) {
               errorMsg.remove();
             }
+            // Hide confirmation if visible (user is editing)
+            hideConfirmation();
             // Clear summary message if all errors are resolved
             const validationResult = validatePeerReviewInput();
             if (validationResult.isValid) {
@@ -516,6 +734,150 @@
           }
         }
       });
+    }
+  }
+
+  function showConfirmation() {
+    // Validate input before showing confirmation
+    const validationResult = validatePeerReviewInput();
+    
+    if (!validationResult.isValid) {
+      // Display validation errors and prevent showing confirmation
+      displayValidationErrors(validationResult);
+      return;
+    }
+
+    // Clear any previous error indicators since validation passed
+    clearValidationErrors();
+
+    // Build confirmation summary
+    buildConfirmationSummary();
+
+    // Hide form submit section and show confirmation section
+    const formSubmitSection = document.querySelector(".form-submit-section");
+    const confirmationSection = document.getElementById("confirmationSection");
+    
+    if (formSubmitSection) {
+      formSubmitSection.style.display = "none";
+    }
+    if (confirmationSection) {
+      confirmationSection.style.display = "block";
+      // Don't auto-scroll - let user control scrolling
+    }
+  }
+
+  function hideConfirmation() {
+    const formSubmitSection = document.querySelector(".form-submit-section");
+    const confirmationSection = document.getElementById("confirmationSection");
+    
+    if (formSubmitSection) {
+      formSubmitSection.style.display = "block";
+    }
+    if (confirmationSection) {
+      confirmationSection.style.display = "none";
+      // Don't auto-scroll - let user control scrolling
+    }
+  }
+
+  function deleteSubmission() {
+    // Confirm deletion
+    if (!confirm("Are you sure you want to delete this submission? All entered data will be cleared.")) {
+      return;
+    }
+
+    // Clear form inputs
+    const teammateSelect = document.getElementById("teammateSelect");
+    const commentBox = document.getElementById("commentBox");
+    
+    if (teammateSelect) {
+      teammateSelect.value = "";
+    }
+    
+    if (commentBox) {
+      commentBox.value = "";
+      updateCommentCounter();
+    }
+
+    // Clear all rating inputs
+    document.querySelectorAll('input[type="radio"]:checked').forEach(input => {
+      input.checked = false;
+    });
+
+    // Clear validation errors
+    clearValidationErrors();
+    setSubmitMessage("", "");
+
+    // Hide confirmation section
+    hideConfirmation();
+
+    // Clear stored comments for current teammate
+    if (currentTeammateId) {
+      commentsByTeammate[currentTeammateId] = "";
+      currentTeammateId = null;
+    }
+
+    // Show success message
+    setSubmitMessage("Submission cleared. You can start a new review.", "info");
+    
+    // Clear message after 3 seconds
+    setTimeout(() => {
+      setSubmitMessage("", "");
+    }, 3000);
+  }
+
+  function buildConfirmationSummary() {
+    const teammateSelect = document.getElementById("teammateSelect");
+    const selectedOption = teammateSelect?.options[teammateSelect.selectedIndex];
+    const teammateName = selectedOption?.textContent || "Not selected";
+    
+    // Update teammate name
+    const confirmationTeammate = document.getElementById("confirmationTeammate");
+    if (confirmationTeammate) {
+      confirmationTeammate.textContent = teammateName;
+    }
+
+    // Build ratings summary
+    const confirmationRatings = document.getElementById("confirmationRatings");
+    if (confirmationRatings) {
+      const ratingsList = [];
+      
+      for (const criterion of criteria) {
+        const ratingInput = document.querySelector(`input[name="rating-${criterion.id}"]:checked`);
+        if (ratingInput) {
+          const rating = Number(ratingInput.value);
+          ratingsList.push({
+            title: criterion.title,
+            rating: rating
+          });
+        }
+      }
+
+      if (ratingsList.length > 0) {
+        confirmationRatings.innerHTML = ratingsList.map(item => {
+          return `
+            <div class="confirmation-rating-item">
+              <span class="confirmation-rating-label">${item.title}:</span>
+              <span class="confirmation-rating-value">${item.rating} / 5</span>
+            </div>
+          `;
+        }).join("");
+      } else {
+        confirmationRatings.innerHTML = '<em style="color: #94a3b8;">No ratings selected</em>';
+      }
+    }
+
+    // Update comments
+    const commentBox = document.getElementById("commentBox");
+    const confirmationComments = document.getElementById("confirmationComments");
+    if (confirmationComments) {
+      const comment = commentBox?.value?.trim() || "";
+      if (comment) {
+        confirmationComments.textContent = comment;
+        confirmationComments.style.color = "#1e293b";
+        confirmationComments.style.fontStyle = "normal";
+      } else {
+        confirmationComments.innerHTML = '<em style="color: #94a3b8;">No comments provided</em>';
+      }
     }
   }
 
@@ -529,11 +891,12 @@
       return;
     }
 
-    // Validate input before proceeding
+    // Validate input before proceeding (double-check)
     const validationResult = validatePeerReviewInput();
     
     if (!validationResult.isValid) {
-      // Display validation errors and prevent submission
+      // Hide confirmation and show form with errors
+      hideConfirmation();
       displayValidationErrors(validationResult);
       return;
     }
@@ -616,6 +979,9 @@
           storeSubmittedReview(revieweeId, reviewData);
         }
 
+        // Hide confirmation section and show form again
+        hideConfirmation();
+
         // Show prominent confirmation message
         setSubmitMessage("✓ Peer review submitted successfully! Thank you for your feedback.", "success");
         
@@ -638,10 +1004,14 @@
         // Don't reset teammate selection - allow user to edit if needed
         // User can manually change teammate or click edit button
 
+        // Note: Report preview will not refresh automatically
+        // Students can only see reports after instructor publishes them
+
         return;
       }
 
       if (res.status === 401) {
+        hideConfirmation();
         setSubmitMessage("Unauthorized. Please login again.", "error");
         setTimeout(() => {
           window.location.href = "login.html";
@@ -650,20 +1020,24 @@
       }
 
       if (res.status === 409) {
+        hideConfirmation();
         const detail = extractDetail(data) || "Conflict: This review may have already been submitted.";
         setSubmitMessage(detail, "error");
         return;
       }
 
       if (res.status === 400 || res.status === 422) {
+        hideConfirmation();
         const detail = extractDetail(data) || "Validation error: Please check your input.";
         setSubmitMessage(detail, "error");
         return;
       }
 
+      hideConfirmation();
       const detail = extractDetail(data) || `Submit failed (HTTP ${res.status}).`;
       setSubmitMessage(detail, "error");
     } catch (err) {
+      hideConfirmation();
       setSubmitMessage("Network error: backend not reachable. Is it running?", "error");
     } finally {
       if (submitReviewBtn) {
