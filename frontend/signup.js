@@ -108,6 +108,9 @@ if (form) {
       if (res.status === 201 || res.ok) {
         // Automatically log in the user after successful signup
         try {
+          // Small delay to ensure user is fully created in database
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
           const loginRes = await fetch(`${BACKEND_URL}/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -120,11 +123,13 @@ if (form) {
           
           try {
             const loginResponseText = await loginRes.text();
+            console.log("Login response text:", loginResponseText);
             if (loginCt.includes("application/json") || loginResponseText.trim().startsWith("{")) {
               loginData = JSON.parse(loginResponseText);
             }
           } catch (parseErr) {
             console.error("Failed to parse login response:", parseErr);
+            console.error("Response text that failed to parse:", loginResponseText);
           }
 
           if (loginRes.ok && loginData && loginData.access_token) {
@@ -138,8 +143,10 @@ if (form) {
             setMessage("✓ Account created successfully! Redirecting...", "success");
             setLoading(false);
             
-            // Redirect immediately (like login flow)
-            window.location.href = "dashboard.html";
+            // Small delay to ensure localStorage is set before redirect
+            setTimeout(() => {
+              window.location.href = "dashboard.html";
+            }, 100);
             return;
           }
           
