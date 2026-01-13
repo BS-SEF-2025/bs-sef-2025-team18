@@ -421,12 +421,22 @@
       else if (error.element) {
         error.element.classList.add('validation-error');
         
-        // Create or update error message element
+        // Find the rating-group within this criterion
+        const ratingGroup = error.element.querySelector('.rating-group');
+        
+        // Create or update error message element - place it after the rating-group
         let errorMsgEl = error.element.querySelector('.validation-error-message');
         if (!errorMsgEl) {
           errorMsgEl = document.createElement('div');
           errorMsgEl.className = 'validation-error-message';
-          error.element.appendChild(errorMsgEl);
+          // Insert after the rating-group (right below the rating options)
+          if (ratingGroup) {
+            // Insert right after the rating-group element
+            ratingGroup.insertAdjacentElement('afterend', errorMsgEl);
+          } else {
+            // Fallback: append to criterionDiv if ratingGroup not found
+            error.element.appendChild(errorMsgEl);
+          }
         }
         errorMsgEl.textContent = error.message;
       }

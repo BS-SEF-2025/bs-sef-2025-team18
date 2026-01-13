@@ -313,3 +313,196 @@ def test_submit_validation_optional_criteria_can_be_omitted(client):
         # If all criteria are required, it should still succeed since we included all required ones
         assert res.status_code == 200, res.text
         assert res.json() == {"ok": True}
+
+
+def test_submit_validation_empty_reviews_list_returns_400(client):
+    """Subtask 1 & 4: Test that empty reviews list returns validation error"""
+    token = _login(client, "student1", "Student123")
+    
+    payload = {"reviews": []}
+    res = client.post("/peer-reviews/submit", json=payload, headers=_auth(token))
+    assert res.status_code == 400, res.text
+    
+    errors = res.json()["detail"]
+    assert isinstance(errors, list)
+    assert len(errors) > 0
+    assert any("No reviews submitted" in e.get("message", "") for e in errors)
+
+
+def test_submit_validation_invalid_teammate_id_returns_400(client):
+    """Test that invalid teammate ID returns validation error"""
+    _register_student(client, "student2", "student2@student.demo", "Student123")
+    
+    token = _login(client, "student1", "Student123")
+    form = client.get("/peer-reviews/form", headers=_auth(token)).json()
+    
+    criteria = form["criteria"]
+    invalid_teammate_id = 99999  # Non-existent teammate ID
+    
+    answers = [{"criterion_id": c["id"], "rating": c["scale"]["max"]} for c in criteria]
+    
+    payload = {"reviews": [{"teammate_id": invalid_teammate_id, "answers": answers}]}
+    res = client.post("/peer-reviews/submit", json=payload, headers=_auth(token))
+    assert res.status_code == 400, res.text
+    
+    errors = res.json()["detail"]
+    assert isinstance(errors, list)
+    assert any("Invalid teammate" in e.get("message", "") for e in errors)
+
+
+def test_submit_validation_invalid_criterion_id_returns_400(client):
+    """Test that invalid criterion ID returns validation error"""
+    _register_student(client, "student2", "student2@student.demo", "Student123")
+    
+    token = _login(client, "student1", "Student123")
+    form = client.get("/peer-reviews/form", headers=_auth(token)).json()
+    
+    teammate_id = form["teammates"][0]["id"]
+    invalid_criterion_id = 99999  # Non-existent criterion ID
+    
+    payload = {
+        "reviews": [
+            {
+                "teammate_id": teammate_id,
+                "answers": [{"criterion_id": invalid_criterion_id, "rating": 5}],
+            }
+        ]
+    }
+    res = client.post("/peer-reviews/submit", json=payload, headers=_auth(token))
+    assert res.status_code == 400, res.text
+    
+    errors = res.json()["detail"]
+    assert isinstance(errors, list)
+    assert any("Invalid criterion" in e.get("message", "") for e in errors)
+
+
+def test_submit_validation_all_required_criteria_must_be_rated(client):
+    """Subtask 1: Test that ALL mandatory criteria must be rated"""
+    _register_student(client, "student2", "student2@student.demo", "Student123")
+    
+    token = _login(client, "student1", "Student123")
+    form = client.get("/peer-reviews/form", headers=_auth(token)).json()
+    
+    teammate_id = form["teammates"][0]["id"]
+    criteria = form["criteria"]
+    required_criteria = [c for c in criteria if c["required"]]
+    
+    # Only rate one required criterion, missing all others
+    if len(required_criteria) > 1:
+        answers = [{"criterion_id": required_criteria[0]["id"], "rating": 5}]
+        
+        payload = {"reviews": [{"teammate_id": teammate_id, "answers": answers}]}
+        res = client.post("/peer-reviews/submit", json=payload, headers=_auth(token))
+        assert res.status_code == 400, res.text
+        
+        errors = res.json()["detail"]
+        assert isinstance(errors, list)
+        # Should have errors for all missing required criteria
+        missing_required_count = len(required_criteria) - 1
+        assert len([e for e in errors if "Rating is required" in e.get("message", "")]) >= missing_required_count
+
+
+def test_submit_validation_rating_at_minimum_boundary_succeeds(client):
+    """Subtask 2: Test that rating at minimum boundary value succeeds"""
+    _register_student(client, "student2", "student2@student.demo", "Student123")
+    
+    token = _login(client, "student1", "Student123")
+    form = client.get("/peer-reviews/form", headers=_auth(token)).json()
+    
+    teammate_id = form["teammates"][0]["id"]
+    criteria = form["criteria"]
+    
+    # Use minimum value for all criteria
+    answers = [{"criterion_id": c["id"], "rating": c["scale"]["min"]} for c in criteria]
+    
+    payload = {"reviews": [{"teammate_id": teammate_id, "answers": answers}]}
+    res = client.post("/peer-reviews/submit", json=payload, headers=_auth(token))
+    assert res.status_code == 200, res.text
+    assert res.json() == {"ok": True}
+
+
+def test_submit_validation_rating_at_maximum_boundary_succeeds(client):
+    """Subtask 2: Test that rating at maximum boundary value succeeds"""
+    _register_student(client, "student2", "student2@student.demo", "Student123")
+    
+    token = _login(client, "student1", "Student123")
+    form = client.get("/peer-reviews/form", headers=_auth(token)).json()
+    
+    teammate_id = form["teammates"][0]["id"]
+    criteria = form["criteria"]
+    
+    # Use maximum value for all criteria
+    answers = [{"criterion_id": c["id"], "rating": c["scale"]["max"]} for c in criteria]
+    
+    payload = {"reviews": [{"teammate_id": teammate_id, "answers": answers}]}
+    res = client.post("/peer-reviews/submit", json=payload, headers=_auth(token))
+    assert res.status_code == 200, res.text
+    assert res.json() == {"ok": True}
+
+
+def test_submit_validation_multiple_reviews_with_errors(client):
+    """Test validation with multiple reviews, some with errors"""
+    _register_student(client, "student2", "student2@student.demo", "Student123")
+    _register_student(client, "student3", "student3@student.demo", "Student123")
+    
+    token = _login(client, "student1", "Student123")
+    form = client.get("/peer-reviews/form", headers=_auth(token)).json()
+    
+    teammates = form["teammates"]
+    criteria = form["criteria"]
+    
+    # First review: valid
+    # Second review: missing required criteria
+    if len(teammates) >= 2:
+        valid_answers = [{"criterion_id": c["id"], "rating": c["scale"]["max"]} for c in criteria]
+        invalid_answers = [{"criterion_id": criteria[0]["id"], "rating": 5}]  # Only one criterion
+        
+        payload = {
+            "reviews": [
+                {"teammate_id": teammates[0]["id"], "answers": valid_answers},
+                {"teammate_id": teammates[1]["id"], "answers": invalid_answers},
+            ]
+        }
+        
+        res = client.post("/peer-reviews/submit", json=payload, headers=_auth(token))
+        assert res.status_code == 400, res.text
+        
+        errors = res.json()["detail"]
+        assert isinstance(errors, list)
+        # Should have errors for missing required criteria in second review
+        assert any("Rating is required" in e.get("message", "") for e in errors)
+
+
+def test_submit_validation_error_messages_are_descriptive(client):
+    """Subtask 3: Test that error messages are descriptive and helpful"""
+    _register_student(client, "student2", "student2@student.demo", "Student123")
+    
+    token = _login(client, "student1", "Student123")
+    form = client.get("/peer-reviews/form", headers=_auth(token)).json()
+    
+    teammate_id = form["teammates"][0]["id"]
+    criteria = form["criteria"]
+    first_criterion = criteria[0]
+    scale_min = first_criterion["scale"]["min"]
+    scale_max = first_criterion["scale"]["max"]
+    
+    # Test out of range error message
+    payload = {
+        "reviews": [
+            {
+                "teammate_id": teammate_id,
+                "answers": [{"criterion_id": first_criterion["id"], "rating": scale_max + 1}],
+            }
+        ]
+    }
+    
+    res = client.post("/peer-reviews/submit", json=payload, headers=_auth(token))
+    assert res.status_code == 400, res.text
+    
+    errors = res.json()["detail"]
+    assert isinstance(errors, list)
+    # Error message should include the valid range
+    assert any(
+        f"Rating must be between {scale_min} and {scale_max}" in e.get("message", "")
+        for e in errors
+    )

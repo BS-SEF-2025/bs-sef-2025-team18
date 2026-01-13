@@ -190,27 +190,42 @@ class SubmitPeerReviewBody(BaseModel):
     reviews: list[ReviewForTeammateIn]
 
 
-@peer_review_router.post("/submit")
-def submit_peer_review(body: SubmitPeerReviewBody, user=Depends(require_roles("student"))):
-    teammates = db.get_student_teammates_except(user["username"])
-    allowed_teammate_ids = {t["id"] for t in teammates}
-
-    criteria = db.get_peer_review_criteria()
-    criteria_by_id = {c["id"]: c for c in criteria}
-    required_criteria_ids = {c["id"] for c in criteria if c["required"]}
-
+def validate_peer_review_submission(
+    reviews: list[ReviewForTeammateIn],
+    allowed_teammate_ids: set[int],
+    criteria: list[dict],
+) -> list[dict]:
+    """
+    Validates peer review submission data.
+    
+    Subtask 1: Verifies that all mandatory criteria have been rated.
+    Subtask 2: Ensures that all ratings are within the allowed scale range.
+    
+    Args:
+        reviews: List of reviews to validate
+        allowed_teammate_ids: Set of valid teammate IDs
+        criteria: List of all criteria with their properties
+        
+    Returns:
+        List of error dictionaries. Empty list if validation passes.
+        Each error dict contains: teammate_id, criterion_id (optional), message
+    """
     errors = []
+    criteria_by_id = {c["id"]: c for c in criteria}
+    required_criteria_ids = {c["id"]: c for c in criteria if c["required"]}
 
-    if not body.reviews:
-        raise HTTPException(status_code=400, detail=[{"message": "No reviews submitted"}])
+    if not reviews:
+        return [{"message": "No reviews submitted"}]
 
-    for r in body.reviews:
+    for r in reviews:
+        # Validate teammate
         if r.teammate_id not in allowed_teammate_ids:
             errors.append({"teammate_id": r.teammate_id, "message": "Invalid teammate"})
             continue
 
         answered_ids = set()
 
+        # Validate each answer
         for a in r.answers:
             crit = criteria_by_id.get(a.criterion_id)
             if not crit:
@@ -222,6 +237,7 @@ def submit_peer_review(body: SubmitPeerReviewBody, user=Depends(require_roles("s
             smin = crit["scale"]["min"]
             smax = crit["scale"]["max"]
 
+            # Subtask 2: Ensure rating is within allowed scale range
             if a.rating is None:
                 errors.append(
                     {"teammate_id": r.teammate_id, "criterion_id": a.criterion_id, "message": "Rating is required"}
@@ -240,8 +256,28 @@ def submit_peer_review(body: SubmitPeerReviewBody, user=Depends(require_roles("s
 
             answered_ids.add(a.criterion_id)
 
-        for cid in (required_criteria_ids - answered_ids):
-            errors.append({"teammate_id": r.teammate_id, "criterion_id": cid, "message": "Rating is required"})
+        # Subtask 1: Verify that all mandatory criteria have been rated
+        missing_required = set(required_criteria_ids.keys()) - answered_ids
+        for cid in missing_required:
+            criterion_title = required_criteria_ids[cid]["title"]
+            errors.append({
+                "teammate_id": r.teammate_id,
+                "criterion_id": cid,
+                "message": f"Rating is required for mandatory criterion: {criterion_title}",
+            })
+
+    return errors
+
+
+@peer_review_router.post("/submit")
+def submit_peer_review(body: SubmitPeerReviewBody, user=Depends(require_roles("student"))):
+    teammates = db.get_student_teammates_except(user["username"])
+    allowed_teammate_ids = {t["id"] for t in teammates}
+
+    criteria = db.get_peer_review_criteria()
+
+    # Validate the submission
+    errors = validate_peer_review_submission(body.reviews, allowed_teammate_ids, criteria)
 
     if errors:
         raise HTTPException(status_code=400, detail=errors)
