@@ -106,8 +106,6 @@ if (form) {
       }
 
       if (res.status === 201 || res.ok) {
-        setMessage("Account created! Logging you in...", "success");
-        
         // Automatically log in the user after successful signup
         try {
           const loginRes = await fetch(`${BACKEND_URL}/auth/login`, {
@@ -116,38 +114,51 @@ if (form) {
             body: JSON.stringify({ username, password }),
           });
 
-          if (loginRes.ok) {
-            const loginData = await loginRes.json();
-            if (loginData && loginData.access_token) {
-              // Save auth data
-              localStorage.setItem("access_token", loginData.access_token);
-              localStorage.setItem("role", loginData.role || role);
-              localStorage.setItem("isLoggedIn", "true");
-              localStorage.setItem("username", username);
-
-              setMessage("Account created! Redirecting to dashboard...", "success");
-              setLoading(false);
-              
-              // Redirect to dashboard immediately
-              window.location.href = "dashboard.html";
-              return;
+          // Parse login response properly
+          const loginCt = loginRes.headers.get("content-type") || "";
+          let loginData = null;
+          
+          try {
+            const loginResponseText = await loginRes.text();
+            if (loginCt.includes("application/json") || loginResponseText.trim().startsWith("{")) {
+              loginData = JSON.parse(loginResponseText);
             }
+          } catch (parseErr) {
+            console.error("Failed to parse login response:", parseErr);
+          }
+
+          if (loginRes.ok && loginData && loginData.access_token) {
+            // Save auth data
+            localStorage.setItem("access_token", loginData.access_token);
+            localStorage.setItem("role", loginData.role || role);
+            localStorage.setItem("isLoggedIn", "true");
+            localStorage.setItem("username", username);
+
+            // Show confirmation message and redirect immediately to dashboard
+            setMessage("✓ Account created successfully! Redirecting...", "success");
+            setLoading(false);
+            
+            // Redirect immediately (like login flow)
+            window.location.href = "dashboard.html";
+            return;
           }
           
-          // If auto-login fails, redirect to login page
-          setMessage("Account created! Please log in.", "success");
+          // If auto-login fails, show error but still allow manual login
+          console.error("Auto-login failed. Status:", loginRes.status, "Data:", loginData);
+          setMessage("✓ Account created successfully! Please log in to continue.", "success");
           setLoading(false);
+          // Redirect to login page after a short delay
           setTimeout(() => {
             window.location.href = "login.html";
-          }, 1500);
+          }, 2000);
         } catch (loginErr) {
           console.error("Auto-login error:", loginErr);
-          // If auto-login fails, redirect to login page
-          setMessage("Account created! Please log in.", "success");
+          // If auto-login fails, show message and redirect to login
+          setMessage("✓ Account created successfully! Please log in to continue.", "success");
           setLoading(false);
           setTimeout(() => {
             window.location.href = "login.html";
-          }, 1500);
+          }, 2000);
         }
         return;
       }

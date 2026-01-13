@@ -53,6 +53,9 @@
 
       // Render rating inputs
       renderRatingInputs();
+      
+      // Setup validation listeners after rendering
+      setupValidationListeners();
     } catch (e) {
       console.error("Failed to load criteria:", e);
       if (ratingContainer) {
@@ -201,9 +204,195 @@
     submitMessage.className = `msg ${type}`;
   }
 
+  /**
+   * Validates peer review input before submission
+   * Returns an object with isValid (boolean) and errors (array of error objects)
+   */
+  function validatePeerReviewInput() {
+    const errors = [];
+    const teammateSelect = document.getElementById("teammateSelect");
+    const revieweeId = teammateSelect?.value;
+
+    // Validate teammate selection
+    if (!revieweeId) {
+      errors.push({
+        type: "teammate",
+        message: "Please select a teammate to review.",
+        element: teammateSelect
+      });
+    }
+
+    // Validate all criteria
+    for (const criterion of criteria) {
+      const ratingInput = document.querySelector(`input[name="rating-${criterion.id}"]:checked`);
+      const criterionDiv = document.querySelector(`input[name="rating-${criterion.id}"]`)?.closest('.criterion-group');
+      
+      // Check if required criteria have ratings
+      if (criterion.required && !ratingInput) {
+        errors.push({
+          type: "missing_rating",
+          criterion_id: criterion.id,
+          criterion_title: criterion.title,
+          message: `Rating is required for "${criterion.title}"`,
+          element: criterionDiv
+        });
+        continue;
+      }
+
+      // If rating exists, validate it's within scale range
+      if (ratingInput) {
+        const rating = Number(ratingInput.value);
+        const scaleMin = criterion.scale?.min || 1;
+        const scaleMax = criterion.scale?.max || 5;
+
+        if (rating < scaleMin || rating > scaleMax) {
+          errors.push({
+            type: "out_of_range",
+            criterion_id: criterion.id,
+            criterion_title: criterion.title,
+            message: `Rating for "${criterion.title}" must be between ${scaleMin} and ${scaleMax}`,
+            element: criterionDiv,
+            scaleMin: scaleMin,
+            scaleMax: scaleMax
+          });
+        }
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors: errors
+    };
+  }
+
+  /**
+   * Displays validation errors with visual indicators
+   */
+  function displayValidationErrors(validationResult) {
+    // Clear previous error indicators
+    clearValidationErrors();
+
+    if (validationResult.isValid) {
+      return;
+    }
+
+    const errorMessages = [];
+    
+    validationResult.errors.forEach(error => {
+      // Handle teammate selection error
+      if (error.type === "teammate" && error.element) {
+        error.element.classList.add('validation-error');
+        // Find the form step containing the teammate select
+        const formStep = error.element.closest('.form-step');
+        if (formStep) {
+          let errorMsgEl = formStep.querySelector('.validation-error-message');
+          if (!errorMsgEl) {
+            errorMsgEl = document.createElement('div');
+            errorMsgEl.className = 'validation-error-message';
+            const formInputWrapper = formStep.querySelector('.form-input-wrapper');
+            if (formInputWrapper) {
+              formInputWrapper.appendChild(errorMsgEl);
+            } else {
+              formStep.appendChild(errorMsgEl);
+            }
+          }
+          errorMsgEl.textContent = error.message;
+        }
+      }
+      // Handle criterion errors
+      else if (error.element) {
+        error.element.classList.add('validation-error');
+        
+        // Create or update error message element
+        let errorMsgEl = error.element.querySelector('.validation-error-message');
+        if (!errorMsgEl) {
+          errorMsgEl = document.createElement('div');
+          errorMsgEl.className = 'validation-error-message';
+          error.element.appendChild(errorMsgEl);
+        }
+        errorMsgEl.textContent = error.message;
+      }
+
+      // Collect error messages for summary
+      errorMessages.push(error.message);
+    });
+
+    // Display summary error message
+    if (errorMessages.length > 0) {
+      const summaryMessage = errorMessages.length === 1 
+        ? errorMessages[0]
+        : `Please fix ${errorMessages.length} validation error(s): ${errorMessages.join('; ')}`;
+      setSubmitMessage(summaryMessage, "error");
+    }
+  }
+
+  /**
+   * Clears all validation error indicators
+   */
+  function clearValidationErrors() {
+    // Remove error classes and error message elements from criterion groups
+    document.querySelectorAll('.criterion-group').forEach(group => {
+      group.classList.remove('validation-error');
+      const errorMsg = group.querySelector('.validation-error-message');
+      if (errorMsg) {
+        errorMsg.remove();
+      }
+    });
+
+    // Clear teammate select error
+    const teammateSelect = document.getElementById("teammateSelect");
+    if (teammateSelect) {
+      teammateSelect.classList.remove('validation-error');
+      // Remove error message from form step
+      const formStep = teammateSelect.closest('.form-step');
+      if (formStep) {
+        const errorMsg = formStep.querySelector('.validation-error-message');
+        if (errorMsg) {
+          errorMsg.remove();
+        }
+      }
+    }
+  }
+
+  /**
+   * Updates validation state when user interacts with form
+   */
+  function setupValidationListeners() {
+    // Clear errors when user selects a teammate
+    const teammateSelect = document.getElementById("teammateSelect");
+    if (teammateSelect) {
+      teammateSelect.addEventListener('change', () => {
+        clearValidationErrors();
+        setSubmitMessage("", "");
+      });
+    }
+
+    // Use event delegation for dynamically created rating inputs
+    // Listen on the rating container for change events on radio buttons
+    const ratingContainer = document.getElementById("ratingContainer");
+    if (ratingContainer) {
+      ratingContainer.addEventListener('change', (e) => {
+        if (e.target.type === 'radio' && e.target.name.startsWith('rating-')) {
+          const criterionGroup = e.target.closest('.criterion-group');
+          if (criterionGroup) {
+            criterionGroup.classList.remove('validation-error');
+            const errorMsg = criterionGroup.querySelector('.validation-error-message');
+            if (errorMsg) {
+              errorMsg.remove();
+            }
+            // Clear summary message if all errors are resolved
+            const validationResult = validatePeerReviewInput();
+            if (validationResult.isValid) {
+              setSubmitMessage("", "");
+            }
+          }
+        }
+      });
+    }
+  }
+
   async function handleSubmit() {
     const token = localStorage.getItem("access_token");
-    const teammateSelect = document.getElementById("teammateSelect");
     const submitReviewBtn = document.getElementById("submitReviewBtn");
 
     if (!token) {
@@ -212,11 +401,20 @@
       return;
     }
 
-    const revieweeId = teammateSelect?.value;
-    if (!revieweeId) {
-      setSubmitMessage("Please select a teammate.", "error");
+    // Validate input before proceeding
+    const validationResult = validatePeerReviewInput();
+    
+    if (!validationResult.isValid) {
+      // Display validation errors and prevent submission
+      displayValidationErrors(validationResult);
       return;
     }
+
+    // Clear any previous error indicators since validation passed
+    clearValidationErrors();
+
+    const teammateSelect = document.getElementById("teammateSelect");
+    const revieweeId = teammateSelect?.value;
 
     // Save current comment
     if (currentTeammateId) {
@@ -226,32 +424,19 @@
       }
     }
 
-    // Collect ratings for all criteria
+    // Collect ratings for all criteria (validation already passed, so we can safely collect)
     const answers = [];
     for (const criterion of criteria) {
       const ratingInput = document.querySelector(`input[name="rating-${criterion.id}"]:checked`);
       
-      if (!ratingInput) {
-        if (criterion.required) {
-          setSubmitMessage(`Please provide a rating for "${criterion.title}".`, "error");
-          return;
-        }
-        continue; // Skip optional criteria without ratings
+      // Only include answered criteria (required ones are guaranteed to be answered after validation)
+      if (ratingInput) {
+        const rating = Number(ratingInput.value);
+        answers.push({
+          criterion_id: criterion.id,
+          rating: rating
+        });
       }
-
-      const rating = Number(ratingInput.value);
-      const scaleMin = criterion.scale?.min || 1;
-      const scaleMax = criterion.scale?.max || 5;
-
-      if (rating < scaleMin || rating > scaleMax) {
-        setSubmitMessage(`Rating for "${criterion.title}" must be between ${scaleMin} and ${scaleMax}.`, "error");
-        return;
-      }
-
-      answers.push({
-        criterion_id: criterion.id,
-        rating: rating
-      });
     }
 
     // Build payload matching backend schema
@@ -267,7 +452,12 @@
     // Disable submit button
     if (submitReviewBtn) {
       submitReviewBtn.disabled = true;
-      submitReviewBtn.textContent = "Submitting...";
+      const buttonText = submitReviewBtn.querySelector("span:last-child");
+      if (buttonText) {
+        buttonText.textContent = "Submitting...";
+      } else {
+        submitReviewBtn.textContent = "Submitting...";
+      }
     }
 
     try {
@@ -284,7 +474,8 @@
       const data = ct.includes("application/json") ? await res.json() : null;
 
       if (res.ok) {
-        setSubmitMessage("Review submitted successfully!", "success");
+        // Show prominent confirmation message
+        setSubmitMessage("✓ Peer review submitted successfully! Thank you for your feedback.", "success");
         
         // Clear the comment for this teammate after successful submission
         if (revieweeId) {
@@ -300,6 +491,12 @@
         document.querySelectorAll('input[type="radio"]:checked').forEach(input => {
           input.checked = false;
         });
+
+        // Reset teammate selection to show form is ready for next review
+        if (teammateSelect) {
+          teammateSelect.value = "";
+          currentTeammateId = null;
+        }
 
         return;
       }
@@ -331,7 +528,12 @@
     } finally {
       if (submitReviewBtn) {
         submitReviewBtn.disabled = false;
-        submitReviewBtn.textContent = "Submit Review";
+        const buttonText = submitReviewBtn.querySelector("span:last-child");
+        if (buttonText) {
+          buttonText.textContent = "Submit Review";
+        } else {
+          submitReviewBtn.textContent = "Submit Review";
+        }
       }
     }
   }
