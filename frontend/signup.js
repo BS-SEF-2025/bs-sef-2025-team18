@@ -16,10 +16,10 @@ function setLoading(isLoading) {
   btn.disabled = isLoading;
   const buttonText = btn.querySelector(".button-text");
   if (buttonText) {
-    buttonText.textContent = isLoading ? "Logging in..." : "Login";
+    buttonText.textContent = isLoading ? "Signing up..." : "Sign up";
   } else {
     // Fallback if button-text element doesn't exist
-    btn.textContent = isLoading ? "Logging in..." : "Login";
+    btn.textContent = isLoading ? "Signing up..." : "Sign up";
   }
 }
 
@@ -55,7 +55,7 @@ if (form) {
     setMessage("");
 
     try {
-      console.log("Attempting login for:", username);
+      console.log("Attempting signup for:", username);
       console.log("Backend URL:", BACKEND_URL);
       const res = await fetch(`${BACKEND_URL}/auth/signup`, {
         method: "POST",
@@ -106,10 +106,49 @@ if (form) {
       }
 
       if (res.status === 201 || res.ok) {
-        setMessage("Account created! Redirecting to login...", "success");
-        setLoading(false);
-        // Redirect immediately
-        window.location.href = "login.html";
+        setMessage("Account created! Logging you in...", "success");
+        
+        // Automatically log in the user after successful signup
+        try {
+          const loginRes = await fetch(`${BACKEND_URL}/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password }),
+          });
+
+          if (loginRes.ok) {
+            const loginData = await loginRes.json();
+            if (loginData && loginData.access_token) {
+              // Save auth data
+              localStorage.setItem("access_token", loginData.access_token);
+              localStorage.setItem("role", loginData.role || role);
+              localStorage.setItem("isLoggedIn", "true");
+              localStorage.setItem("username", username);
+
+              setMessage("Account created! Redirecting to dashboard...", "success");
+              setLoading(false);
+              
+              // Redirect to dashboard immediately
+              window.location.href = "dashboard.html";
+              return;
+            }
+          }
+          
+          // If auto-login fails, redirect to login page
+          setMessage("Account created! Please log in.", "success");
+          setLoading(false);
+          setTimeout(() => {
+            window.location.href = "login.html";
+          }, 1500);
+        } catch (loginErr) {
+          console.error("Auto-login error:", loginErr);
+          // If auto-login fails, redirect to login page
+          setMessage("Account created! Please log in.", "success");
+          setLoading(false);
+          setTimeout(() => {
+            window.location.href = "login.html";
+          }, 1500);
+        }
         return;
       }
 
