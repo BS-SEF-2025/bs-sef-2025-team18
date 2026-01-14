@@ -1,5 +1,5 @@
-// Use global BACKEND_URL from window
-const BACKEND_URL = window.BACKEND_URL;
+// Use global API_BASE from window (fallback to BACKEND_URL for compatibility)
+const API_BASE = window.API_BASE || window.BACKEND_URL;
 
 // ---------- Helper Functions ----------
 function getToken() {
@@ -77,8 +77,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       try {
         console.log("Attempting login for:", username);
-        console.log("Backend URL:", BACKEND_URL);
-        const res = await fetch(`${BACKEND_URL}/auth/login`, {
+        console.log("Backend URL:", API_BASE);
+        const res = await fetch(`${API_BASE}/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ username, password }),
@@ -94,7 +94,7 @@ document.addEventListener("DOMContentLoaded", () => {
           console.log("Response status:", res.status);
           console.log("Response headers:", Object.fromEntries(res.headers.entries()));
           console.log("Response body (first 500 chars):", responseText.substring(0, 500));
-          console.log("Request URL was:", `${BACKEND_URL}/auth/login`);
+          console.log("Request URL was:", `${API_BASE}/auth/login`);
           
           if (ct.includes("application/json") || responseText.trim().startsWith("{")) {
             data = JSON.parse(responseText);
@@ -103,7 +103,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // Show more helpful error message
             let errorMsg = "Server returned non-JSON response. ";
             if (responseText.includes("404") || responseText.includes("Not Found")) {
-              errorMsg += `The endpoint ${BACKEND_URL}/auth/login was not found. Is the backend running?`;
+              errorMsg += `The endpoint ${API_BASE}/auth/login was not found. Is the backend running?`;
             } else if (responseText.includes("<!DOCTYPE") || responseText.includes("<html")) {
               errorMsg += "Received HTML instead of JSON. The backend might not be running or the URL is incorrect.";
             } else {

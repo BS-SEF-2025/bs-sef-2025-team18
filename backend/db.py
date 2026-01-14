@@ -346,3 +346,173 @@ def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
             (user_id,),
         ).fetchone()
         return dict(row) if row else None
+
+
+def get_individual_peer_reviews_for_student(student_id: int) -> list[dict]:
+    """
+    Get individual peer reviews received by a student, grouped by reviewer.
+    Returns a list of reviews, each containing reviewer info and all their ratings.
+    """
+    with get_conn() as conn:
+        # Get all reviews for this student
+        rows = conn.execute(
+            """
+            SELECT 
+                prs.reviewer_id,
+                u.username as reviewer_username,
+                prs.reviewee_id,
+                prs.criterion_id,
+                prc.title as criterion_title,
+                prc.weight as criterion_weight,
+                prc.scale_min,
+                prc.scale_max,
+                prs.rating,
+                prs.submitted_at
+            FROM peer_review_submissions prs
+            JOIN users u ON prs.reviewer_id = u.id
+            JOIN peer_review_criteria prc ON prs.criterion_id = prc.id
+            WHERE prs.reviewee_id = ?
+            ORDER BY prs.reviewer_id, prs.criterion_id
+            """,
+            (student_id,),
+        ).fetchall()
+        
+        if not rows:
+            return []
+        
+        # Group by reviewer
+        reviews_by_reviewer = {}
+        for row in rows:
+            reviewer_id = row["reviewer_id"]
+            reviewer_username = row["reviewer_username"]
+            
+            if reviewer_id not in reviews_by_reviewer:
+                reviews_by_reviewer[reviewer_id] = {
+                    "reviewer_id": reviewer_id,
+                    "reviewer_username": reviewer_username,
+                    "submitted_at": row["submitted_at"],
+                    "ratings": []
+                }
+            
+            reviews_by_reviewer[reviewer_id]["ratings"].append({
+                "criterion_id": row["criterion_id"],
+                "criterion_title": row["criterion_title"],
+                "criterion_weight": float(row["criterion_weight"]),
+                "rating": row["rating"],
+                "scale_min": row["scale_min"],
+                "scale_max": row["scale_max"]
+            })
+        
+        # Convert to list and calculate total scores
+        result = []
+        for reviewer_id, review_data in reviews_by_reviewer.items():
+            ratings = review_data["ratings"]
+            
+            # Calculate weighted total score for this review
+            total_weighted_score = 0.0
+            total_weight = 0.0
+            for rating_data in ratings:
+                weight = rating_data["criterion_weight"]
+                rating = rating_data["rating"]
+                total_weighted_score += rating * weight
+                total_weight += weight
+            
+            total_score = round(total_weighted_score / total_weight, 2) if total_weight > 0 else 0.0
+            
+            result.append({
+                "reviewer_id": review_data["reviewer_id"],
+                "reviewer_username": review_data["reviewer_username"],
+                "submitted_at": review_data["submitted_at"],
+                "ratings": ratings,
+                "total_score": total_score
+            })
+        
+        # Sort by submitted_at (most recent first)
+        result.sort(key=lambda x: x["submitted_at"], reverse=True)
+        
+        return result
+
+
+def get_reviews_submitted_by_reviewer(reviewer_id: int) -> list[dict]:
+    """
+    Get all reviews submitted by a reviewer, grouped by reviewee.
+    Returns a list of reviews, each containing reviewee info and all ratings given to them.
+    """
+    with get_conn() as conn:
+        # Get all reviews submitted by this reviewer
+        rows = conn.execute(
+            """
+            SELECT 
+                prs.reviewer_id,
+                prs.reviewee_id,
+                u.username as reviewee_username,
+                prs.criterion_id,
+                prc.title as criterion_title,
+                prc.weight as criterion_weight,
+                prc.scale_min,
+                prc.scale_max,
+                prs.rating,
+                prs.submitted_at
+            FROM peer_review_submissions prs
+            JOIN users u ON prs.reviewee_id = u.id
+            JOIN peer_review_criteria prc ON prs.criterion_id = prc.id
+            WHERE prs.reviewer_id = ?
+            ORDER BY prs.reviewee_id, prs.criterion_id
+            """,
+            (reviewer_id,),
+        ).fetchall()
+        
+        if not rows:
+            return []
+        
+        # Group by reviewee
+        reviews_by_reviewee = {}
+        for row in rows:
+            reviewee_id = row["reviewee_id"]
+            reviewee_username = row["reviewee_username"]
+            
+            if reviewee_id not in reviews_by_reviewee:
+                reviews_by_reviewee[reviewee_id] = {
+                    "reviewee_id": reviewee_id,
+                    "reviewee_username": reviewee_username,
+                    "submitted_at": row["submitted_at"],
+                    "ratings": []
+                }
+            
+            reviews_by_reviewee[reviewee_id]["ratings"].append({
+                "criterion_id": row["criterion_id"],
+                "criterion_title": row["criterion_title"],
+                "criterion_weight": float(row["criterion_weight"]),
+                "rating": row["rating"],
+                "scale_min": row["scale_min"],
+                "scale_max": row["scale_max"]
+            })
+        
+        # Convert to list and calculate total scores
+        result = []
+        for reviewee_id, review_data in reviews_by_reviewee.items():
+            ratings = review_data["ratings"]
+            
+            # Calculate weighted total score for this review
+            total_weighted_score = 0.0
+            total_weight = 0.0
+            for rating_data in ratings:
+                weight = rating_data["criterion_weight"]
+                rating = rating_data["rating"]
+                total_weighted_score += rating * weight
+                total_weight += weight
+            
+            total_score = round(total_weighted_score / total_weight, 2) if total_weight > 0 else 0.0
+            
+            result.append({
+                "reviewee_id": review_data["reviewee_id"],
+                "reviewee_username": review_data["reviewee_username"],
+                "submitted_at": review_data["submitted_at"],
+                "ratings": ratings,
+                "total_score": total_score
+            })
+        
+        # Sort by submitted_at (most recent first)
+        result.sort(key=lambda x: x["submitted_at"], reverse=True)
+        
+        return result

@@ -150,10 +150,22 @@
       <!-- Peer Review Report Card (only for students) -->
       <section id="studentReportCard" class="dashboard-card">
         <div class="card-header">
-          <h2 class="card-title">
-            <span class="card-icon">📊</span>
-            Peer Review Report
-          </h2>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 class="card-title">
+              <span class="card-icon">📊</span>
+              Peer Review Report
+            </h2>
+            <div style="display: flex; gap: 12px; align-items: center;">
+              <a href="results.html" style="text-decoration: none; color: #667eea; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 6px;">
+                <span>My Reviews</span>
+                <span>→</span>
+              </a>
+              <a href="all-results.html" style="text-decoration: none; color: #667eea; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 6px;">
+                <span>All Results</span>
+                <span>→</span>
+              </a>
+            </div>
+          </div>
         </div>
         <div class="card-body">
           <!-- Loading State -->
@@ -904,7 +916,7 @@
             const successMsg = data.message || "✓ Results published successfully! Students can now view their reports.";
             
             if (data.already_published) {
-              setPublishMessage("Results are already published. Students can view their reports.", "info");
+              setPublishMessage("Results published successfully", "success");
             } else {
               setPublishMessage(successMsg, "success");
             }
