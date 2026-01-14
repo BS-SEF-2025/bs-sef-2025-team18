@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>All Peer Review Results - PeerEval Pro</title>
+
+  <!-- Define global BACKEND_URL before any scripts -->
+  <script>
+    window.BACKEND_URL = "http://127.0.0.1:8000";
+  </script>
+
+  <!-- Page protection -->
+  <script src="protected.js"></script>
+</head>
+<body class="dashboard-body">
+  <!-- Top Navigation Bar -->
+  <nav class="dashboard-nav">
+    <div class="nav-brand">
+      <span class="brand-icon">📊</span>
+      <span class="brand-text">PeerEval Pro</span>
+    </div>
+    <div class="nav-user">
+      <div class="user-profile">
+        <div class="user-avatar">
+          <span id="userInitial">U</span>
+        </div>
+        <div class="user-details">
+          <span class="user-name" id="userNameDisplay">User</span>
+          <span class="user-role" id="userRoleDisplay">Student</span>
+        </div>
+      </div>
+      <div style="display: flex; gap: 12px;">
+        <a href="dashboard.html" class="logout-btn-nav" style="text-decoration: none; display: flex; align-items: center; gap: 8px;">
+          <span>🏠</span>
+          <span>Dashboard</span>
+        </a>
+        <button id="logoutBtn" class="logout-btn-nav">
+          <span>🚪</span>
+          <span>Logout</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Dashboard Container -->
+  <div class="dashboard-container">
+    <!-- Welcome Header -->
+    <div class="dashboard-welcome">
+      <h1 id="welcomeText">All Peer Review Results</h1>
+      <p class="welcome-subtitle">View peer review results for all students</p>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="dashboard-card" style="display: block; text-align: center; padding: 40px;">
+      <div style="width: 40px; height: 40px; border: 4px solid #e5e7eb; border-top-color: #667eea; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 16px;"></div>
+      <p>Loading all peer review results...</p>
+      <style>
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      </style>
+    </div>
+
+    <!-- Error State -->
+    <div id="errorState" class="dashboard-card" style="display: none; text-align: center; padding: 40px;">
+      <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+      <p id="errorMessage" class="error"></p>
+    </div>
+
+    <!-- No Data State -->
+    <div id="noDataState" class="dashboard-card" style="display: none; text-align: center; padding: 40px;">
+      <div style="font-size: 48px; margin-bottom: 16px;">📋</div>
+      <p id="noDataMessage" style="color: #6b7280; font-size: 16px;"></p>
+    </div>
+
+    <!-- Results Content -->
+    <div id="resultsContent" style="display: none;">
+      <!-- Summary Card -->
+      <div class="dashboard-card" style="margin-bottom: 24px;">
+        <div class="card-header">
+          <h2 class="card-title">
+            <span class="card-icon">📊</span>
+            Summary
+          </h2>
+        </div>
+        <div class="card-body">
+          <div style="display: flex; gap: 32px; flex-wrap: wrap;">
+            <div>
+              <div style="font-size: 32px; font-weight: 600; color: #667eea;" id="totalStudentsCount">0</div>
+              <div style="color: #6b7280; font-size: 14px; margin-top: 4px;">Total Students</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Students Results List -->
+      <div id="studentsResultsList" class="students-results-list-container"></div>
+    </div>
+  </div>
+
+  <script>
+    // renamed to avoid collision with protected.js
+    const API_BASE_URL = window.BACKEND_URL;
+
+    // Initialize page
+    document.addEventListener("DOMContentLoaded", () => {
+      const username = localStorage.getItem("username") || "User";
+      const role = localStorage.getItem("role") || "student";
+      
+      // Update user profile
+      const userNameDisplay = document.getElementById("userNameDisplay");
+      const userRoleDisplay = document.getElementById("userRoleDisplay");
+      const userInitial = document.getElementById("userInitial");
+      
+      if (userNameDisplay) userNameDisplay.textContent = username;
+      if (userRoleDisplay) userRoleDisplay.textContent = role.charAt(0).toUpperCase() + role.slice(1);
+      if (userInitial) userInitial.textContent = username.charAt(0).toUpperCase();
+
+      // Logout handler
+      document.getElementById("logoutBtn").addEventListener("click", () => {
+        localStorage.removeItem("isLoggedIn");
+        localStorage.removeItem("username");
+        localStorage.removeItem("role");
+        localStorage.removeItem("access_token");
+        window.location.href = "login.html";
+      });
+
+      // Only allow students to access this page
+      if (role !== "student") {
+        showError("This page is only available for students.");
+        return;
+      }
+
+      // Load all results
+      console.log("Loading all results for students...");
+      console.log("API_BASE_URL:", API_BASE_URL);
+      console.log("Role:", role);
+      console.log("Username:", username);
+      
+      const loadingState = document.getElementById("loadingState");
+      const errorState = document.getElementById("errorState");
+      const resultsContent = document.getElementById("resultsContent");
+      const noDataState = document.getElementById("noDataState");
+      
+      console.log("Elements found:", {
+        loadingState: !!loadingState,
+        errorState: !!errorState,
+        resultsContent: !!resultsContent,
+        noDataState: !!noDataState
+      });
+      
+      // Ensure loading state is visible initially
+      if (loadingState) {
+        loadingState.style.display = "block";
+        console.log("Loading state set to block");
+      } else {
+        console.error("loadingState element not found!");
+      }
+      if (errorState) {
+        errorState.style.display = "none";
+      }
+      if (resultsContent) {
+        resultsContent.style.display = "none";
+      }
+      if (noDataState) {
+        noDataState.style.display = "none";
+      }
+      
+      // Small delay to ensure DOM is ready
+      setTimeout(() => {
+        console.log("Timeout fired, calling loadAllResults");
+        // Add a failsafe timeout to ensure loading is always hidden
+        const failsafeTimeout = setTimeout(() => {
+          console.warn("Failsafe timeout: hiding loading state after 15 seconds");
+          hideLoading();
+          const errorState = document.getElementById("errorState");
+          const errorMessage = document.getElementById("errorMessage");
+          if (errorState && errorMessage) {
+            errorState.style.display = "block";
+            errorMessage.textContent = "Request is taking too long. Please check your connection and try again.";
+          }
+        }, 15000); // 15 second failsafe
+        
+        loadAllResults().finally(() => {
+          clearTimeout(failsafeTimeout);
+        });
+      }, 100);
+    });
+
+    async function loadAllResults() {
+      console.log("loadAllResults called");
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        console.error("No access token found in localStorage");
+        hideLoading();
+        showError("You are not logged in.");
+        return;
+      }
+
+      console.log("Token found, proceeding with API call");
+
+      const loadingState = document.getElementById("loadingState");
+      const errorState = document.getElementById("errorState");
+      const resultsContent = document.getElementById("resultsContent");
+      const noDataState = document.getElementById("noDataState");
+
+      // Always start by showing loading and hiding other states
+      if (loadingState) loadingState.style.display = "block";
+      if (errorState) errorState.style.display = "none";
+      if (resultsContent) resultsContent.style.display = "none";
+      if (noDataState) noDataState.style.display = "none";
+
+      try {
+        const url = `${API_BASE_URL}/peer-reviews/all-results`;
+
+        console.log("Fetching all results from:", url);
+
+        // Add timeout to prevent hanging
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+        let res;
+        try {
+          res = await fetch(url, {
+            method: "GET",
+            headers: {
+              "Authorization": `Bearer ${token}`,
+            },
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          console.error("Fetch error:", fetchError);
+          
+          hideLoading();
+          
+          if (fetchError.name === 'AbortError') {
+            showError("Request timed out. The backend server may not be responding.");
+            return;
+          }
+          if (fetchError.message && (fetchError.message.includes("Failed to fetch") || fetchError.message.includes("NetworkError"))) {
+            showError(`Backend server not responding. Please ensure the backend is running on ${API_BASE_URL}.`);
+            return;
+          }
+          showError("Network error occurred. Please check your connection and try again.");
+          return;
+        }
+
+        console.log("All results fetch response status:", res.status, res.statusText);
+
+        // Handle HTTP error status codes
+        if (!res.ok) {
+          console.log("Response not OK, status:", res.status);
+          hideLoading();
+          
+          let errorMessage = "Failed to load peer review results.";
+          
+          try {
+            if (res.status === 403) {
+              const errorData = await res.json().catch(() => ({}));
+              console.log("403 error data:", errorData);
+              if (errorData.detail && errorData.detail.toLowerCase().includes("not been published")) {
+                errorMessage = "Results have not been published yet. Please wait for the instructor to publish results.";
+              } else {
+                errorMessage = errorData.detail || "Access denied.";
+              }
+            } else if (res.status === 401) {
+              errorMessage = "You are not logged in.";
+              localStorage.removeItem("access_token");
+              localStorage.removeItem("isLoggedIn");
+            } else if (res.status === 404) {
+              errorMessage = "Results endpoint not found.";
+            } else {
+              const errorData = await res.json().catch(() => ({}));
+              errorMessage = errorData.detail || `Failed to load results (HTTP ${res.status})`;
+            }
+          } catch (parseError) {
+            console.error("Error parsing error response:", parseError);
+            errorMessage = `Failed to load results (HTTP ${res.status}). Please check if results have been published.`;
+          }
+          
+          showError(errorMessage);
+          return;
+        }
+
+        let data;
+        let responseText = "";
+        try {
+          responseText = await res.text();
+          console.log("Raw response text:", responseText);
+          if (!responseText || responseText.trim() === "") {
+            console.error("Empty response from server");
+            hideLoading();
+            showError("Empty response from server.");
+            return;
+          }
+          data = JSON.parse(responseText);
+          console.log("All results data received:", data);
+          console.log("Students array:", data.students);
+          console.log("Number of students:", data.students ? data.students.length : 0);
+        } catch (jsonError) {
+          console.error("Failed to parse JSON response:", jsonError);
+          console.error("Response text was:", responseText);
+          hideLoading();
+          showError("Invalid response from server. Please check the console for details.");
+          return;
+        }
+
+        // Check if we have valid data
+        if (!data) {
+          console.error("Data is null or undefined");
+          hideLoading();
+          showError("No results data received from server.");
+          return;
+        }
+
+        // Check if there are no students
+        if (!data.students || data.students.length === 0) {
+          console.log("No students found in response");
+          hideLoading();
+          if (resultsContent) resultsContent.style.display = "none";
+          if (errorState) errorState.style.display = "none";
+          if (noDataState) noDataState.style.display = "block";
+          const noDataMessage = document.getElementById("noDataMessage");
+          if (noDataMessage) {
+            noDataMessage.textContent = data.message || "No students found. Results may not be published yet or no reviews have been submitted.";
+          }
+          return;
+        }
+
+        console.log(`Found ${data.students.length} students, proceeding to display`);
+
+        // Success: Hide loading, show content
+        console.log("Hiding loading state and showing content");
+        hideLoading();
+        if (errorState) errorState.style.display = "none";
+        if (noDataState) noDataState.style.display = "none";
+        if (resultsContent) {
+          resultsContent.style.display = "block";
+          console.log("Results content is now visible");
+        } else {
+          console.error("resultsContent element not found!");
+        }
+
+        console.log("Displaying all results content");
+        // Display results data
+        try {
+          displayAllResults(data);
+          console.log("displayAllResults completed successfully");
+        } catch (displayError) {
+          console.error("Error in displayAllResults:", displayError);
+          console.error("Display error stack:", displayError.stack);
+          hideLoading();
+          if (resultsContent) resultsContent.style.display = "none";
+          showError("Failed to display results data. Please check the console for details.");
+        }
+
+      } catch (err) {
+        console.error("Error loading all results:", err);
+        console.error("Error name:", err.name);
+        console.error("Error message:", err.message);
+        console.error("Error stack:", err.stack);
+        hideLoading();
+        showError(`Failed to load peer review results: ${err.message || "Unknown error"}. Please check the browser console for details.`);
+      }
+    }
+
+    function hideLoading() {
+      console.log("hideLoading called");
+      const loadingState = document.getElementById("loadingState");
+      if (loadingState) {
+        loadingState.style.display = "none";
+        console.log("Loading state hidden");
+      } else {
+        console.error("loadingState element not found!");
+      }
+    }
+
+    function displayAllResults(data) {
+      if (!data || !data.students) {
+        console.error("No data or students provided to displayAllResults");
+        showError("No results data available.");
+        return;
+      }
+
+      console.log("displayAllResults called with data:", data);
+
+      // Update total students count
+      const totalStudentsEl = document.getElementById("totalStudentsCount");
+      if (totalStudentsEl) {
+        totalStudentsEl.textContent = data.total_students || data.students.length || 0;
+      }
+
+      // Display students results
+      const studentsList = document.getElementById("studentsResultsList");
+      if (!studentsList) {
+        console.error("studentsResultsList element not found");
+        return;
+      }
+
+      studentsList.innerHTML = "";
+
+      // Filter students with scores (matching instructor page behavior)
+      const studentsWithScores = data.students.filter(studentData => {
+        return studentData.overall_score !== null && 
+               studentData.overall_score !== undefined;
+      });
+
+      if (studentsWithScores.length === 0) {
+        // Show no data message in the results content area
+        const noDataState = document.getElementById("noDataState");
+        const loadingState = document.getElementById("loadingState");
+        const resultsContent = document.getElementById("resultsContent");
+        const errorState = document.getElementById("errorState");
+        
+        if (loadingState) loadingState.style.display = "none";
+        if (errorState) errorState.style.display = "none";
+        if (resultsContent) resultsContent.style.display = "none";
+        if (noDataState) {
+          noDataState.style.display = "block";
+          const noDataMessage = document.getElementById("noDataMessage");
+          if (noDataMessage) {
+            noDataMessage.textContent = "No students with scores available yet. Students will appear here once they receive peer reviews and results are published.";
+          }
+        }
+        return;
+      }
+
+      // Create a container card for the list (similar to instructor page)
+      const containerCard = document.createElement("div");
+      containerCard.className = "dashboard-card";
+      
+      let studentsHTML = "";
+      
+      studentsWithScores.forEach((studentData, index) => {
+        const studentUsername = studentData.student_username || "Unknown";
+        const overallScore = studentData.overall_score;
+
+        // Calculate score color (matching instructor page)
+        let scoreColor = "#6b7280";
+        let scoreText = "N/A";
+        if (overallScore !== null && overallScore !== undefined) {
+          scoreText = overallScore.toFixed(2);
+          if (overallScore >= 4) {
+            scoreColor = "#10b981"; // green
+          } else if (overallScore >= 3) {
+            scoreColor = "#f59e0b"; // amber
+          } else {
+            scoreColor = "#ef4444"; // red
+          }
+        }
+
+        // Format matching instructor page (dashboard.html lines 1097-1111)
+        studentsHTML += `
+          <div class="student-report-item" style="padding: 16px; margin-bottom: 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="flex: 1;">
+                <div style="font-weight: 600; color: #1e293b; font-size: 14px;">${studentUsername}</div>
+              </div>
+              <div style="text-align: right; margin-left: 16px;">
+                <div style="font-size: 24px; font-weight: bold; color: ${scoreColor};">
+                  ${scoreText}
+                </div>
+                <div style="font-size: 10px; color: #64748b;">Score</div>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      containerCard.innerHTML = `
+        <div class="card-header">
+          <h2 class="card-title">
+            <span class="card-icon">📊</span>
+            Student Scores
+          </h2>
+        </div>
+        <div class="card-body">
+          ${studentsHTML}
+        </div>
+      `;
+
+      studentsList.appendChild(containerCard);
+      console.log(`Successfully rendered ${studentsWithScores.length} student scores`);
+    }
+
+    function showError(message) {
+      hideLoading();
+      
+      const errorState = document.getElementById("errorState");
+      const resultsContent = document.getElementById("resultsContent");
+      const noDataState = document.getElementById("noDataState");
+      const loadingState = document.getElementById("loadingState");
+      const errorMessageEl = document.getElementById("errorMessage");
+
+      if (loadingState) {
+        loadingState.style.display = "none";
+      }
+      if (resultsContent) {
+        resultsContent.style.display = "none";
+      }
+      if (noDataState) {
+        noDataState.style.display = "none";
+      }
+      if (errorState) {
+        errorState.style.display = "block";
+      }
+      if (errorMessageEl) {
+        errorMessageEl.textContent = message;
+      }
+      
+      console.error("Showing error to user:", message);
+    }
+  </script>
+</body>
+</html>

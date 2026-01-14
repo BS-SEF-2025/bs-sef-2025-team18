@@ -580,5 +580,173 @@ def get_personal_report(
     }
 
 
+@peer_review_router.get("/results")
+def get_peer_review_results(
+    user=Depends(get_current_user), 
+    student_id: Optional[int] = Query(None, description="Student ID (optional for students viewing other students, required for instructors)")
+):
+    """
+    Get individual peer review results for a student.
+    Returns a list of received peer reviews, each showing reviewer name, ratings per criterion, and total score.
+    Only available after results are published (unless user is an instructor).
+    
+    For instructors: can view any student's results by providing student_id parameter.
+    For students: can view their own results, or other students' results if student_id is provided (only after results are published).
+    """
+    # Check if results are published (instructors can bypass this)
+    # Students can only view results after instructor publishes them
+    results_published = db.are_results_published()
+    if user["role"] != "instructor" and not results_published:
+        raise HTTPException(
+            status_code=403,
+            detail="Results have not been published yet. Please wait for the instructor to publish results."
+        )
+    
+    # Determine which student's results to show
+    if user["role"] == "instructor":
+        # Instructors can view any student's results
+        if student_id:
+            student = db.get_user_by_id(student_id)
+            if not student:
+                raise HTTPException(status_code=404, detail="Student not found")
+            if student["role"] != "student":
+                raise HTTPException(status_code=400, detail="Can only view results for students")
+        else:
+            # If no student_id provided, return empty response
+            return {
+                "student_id": None,
+                "student_username": None,
+                "reviews": [],
+                "message": "Please select a student to view their peer review results.",
+                "requires_selection": True
+            }
+    else:
+        # Students can view their own results or other students' results (if student_id provided)
+        if student_id:
+            # Viewing another student's results
+            student = db.get_user_by_id(student_id)
+            if not student:
+                raise HTTPException(status_code=404, detail="Student not found")
+            if student["role"] != "student":
+                raise HTTPException(status_code=400, detail="Can only view results for students")
+        else:
+            # Viewing own results
+            student = db.get_user_by_username(user["username"])
+            if not student:
+                raise HTTPException(status_code=404, detail="Student not found")
+    
+    student_id = student["id"]
+    
+    # Get individual peer reviews
+    reviews = db.get_individual_peer_reviews_for_student(student_id)
+    
+    if not reviews:
+        return {
+            "student_id": student_id,
+            "student_username": student["username"],
+            "reviews": [],
+            "message": "No peer reviews received yet."
+        }
+    
+    return {
+        "student_id": student_id,
+        "student_username": student["username"],
+        "reviews": reviews,
+        "total_reviews": len(reviews)
+    }
+
+
+@peer_review_router.get("/all-results")
+def get_all_peer_review_results(user=Depends(require_roles("student"))):
+    """
+    Get peer review results for all students.
+    Only available to students after results are published.
+    Returns a list of all students with their individual peer review results.
+    """
+    # Check if results are published
+    results_published = db.are_results_published()
+    if not results_published:
+        raise HTTPException(
+            status_code=403,
+            detail="Results have not been published yet. Please wait for the instructor to publish results."
+        )
+    
+    # Get all students
+    students = db.get_all_students()
+    
+    if not students:
+        return {
+            "students": [],
+            "message": "No students found."
+        }
+    
+    # Get results for each student
+    all_results = []
+    for student in students:
+        reviews = db.get_individual_peer_reviews_for_student(student["id"])
+        
+        # Calculate overall score from reviews if available
+        overall_score = None
+        if reviews:
+            # Calculate weighted average from all reviews
+            total_weighted_score = 0.0
+            total_weight = 0.0
+            for review in reviews:
+                if review.get("total_score") is not None:
+                    # Use the total_score from each review (which is already weighted)
+                    # We'll average the total scores from all reviewers
+                    total_weighted_score += review["total_score"]
+                    total_weight += 1.0
+            
+            if total_weight > 0:
+                overall_score = round(total_weighted_score / total_weight, 2)
+        
+        all_results.append({
+            "student_id": student["id"],
+            "student_username": student["username"],
+            "student_email": student.get("email", ""),
+            "reviews": reviews,
+            "total_reviews": len(reviews),
+            "overall_score": overall_score
+        })
+    
+    # Sort by overall_score descending (highest first), then by username
+    all_results.sort(key=lambda x: (x["overall_score"] if x["overall_score"] is not None else -1, x["student_username"]), reverse=True)
+    
+    return {
+        "students": all_results,
+        "total_students": len(all_results)
+    }
+
+
+@peer_review_router.get("/my-submitted-reviews")
+def get_my_submitted_reviews(user=Depends(require_roles("student"))):
+    """
+    Get all reviews submitted by the authenticated student.
+    Returns a list of reviews grouped by reviewee, showing who the student reviewed.
+    """
+    # Get reviewer info
+    reviewer = db.get_user_by_username(user["username"])
+    if not reviewer:
+        raise HTTPException(status_code=404, detail="Reviewer not found")
+    
+    reviewer_id = reviewer["id"]
+    
+    # Get all reviews submitted by this reviewer
+    reviews = db.get_reviews_submitted_by_reviewer(reviewer_id)
+    
+    if not reviews:
+        return {
+            "reviews": [],
+            "total_reviews": 0,
+            "message": "You haven't submitted any reviews yet."
+        }
+    
+    return {
+        "reviews": reviews,
+        "total_reviews": len(reviews)
+    }
+
+
 app.include_router(peer_review_router)
 app.include_router(auth_router)

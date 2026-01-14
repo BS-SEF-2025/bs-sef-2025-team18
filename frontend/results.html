@@ -1,0 +1,959 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>Peer Review Results - PeerEval Pro</title>
+  <style>
+    .tab-button {
+      transition: all 0.2s ease;
+    }
+    .tab-button:hover {
+      color: #667eea !important;
+      background-color: rgba(102, 126, 234, 0.05);
+    }
+  </style>
+
+  <!-- Define global API_BASE before any scripts -->
+  <script>
+    window.API_BASE = "http://127.0.0.1:8000";
+  </script>
+
+  <!-- Page protection -->
+  <script src="protected.js"></script>
+</head>
+<body class="dashboard-body">
+  <!-- Top Navigation Bar -->
+  <nav class="dashboard-nav">
+    <div class="nav-brand">
+      <span class="brand-icon">📊</span>
+      <span class="brand-text">PeerEval Pro</span>
+    </div>
+    <div class="nav-user">
+      <div class="user-profile">
+        <div class="user-avatar">
+          <span id="userInitial">U</span>
+        </div>
+        <div class="user-details">
+          <span class="user-name" id="userNameDisplay">User</span>
+          <span class="user-role" id="userRoleDisplay">Student</span>
+        </div>
+      </div>
+      <div style="display: flex; gap: 12px;">
+        <a id="viewAllResultsBtn" href="all-results.html" class="logout-btn-nav" style="text-decoration: none; display: none; align-items: center; gap: 8px;">
+          <span>👥</span>
+          <span>View All Students Results</span>
+        </a>
+        <a href="dashboard.html" class="logout-btn-nav" style="text-decoration: none; display: flex; align-items: center; gap: 8px;">
+          <span>🏠</span>
+          <span>Dashboard</span>
+        </a>
+        <button id="logoutBtn" class="logout-btn-nav">
+          <span>🚪</span>
+          <span>Logout</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Dashboard Container -->
+  <div class="dashboard-container">
+    <!-- Welcome Header -->
+    <div class="dashboard-welcome">
+      <h1 id="welcomeText">Peer Review Results</h1>
+      <p class="welcome-subtitle">View detailed feedback from your teammates</p>
+      <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
+        <a href="all-results.html" style="text-decoration: none; color: #667eea; font-size: 14px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.2);">
+          <span>👥</span>
+          <span>View All Students Results</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Tab Navigation (only for students) -->
+    <div id="tabNavigation" class="dashboard-card" style="display: none; margin-bottom: 24px;">
+      <div style="display: flex; gap: 8px; border-bottom: 2px solid #e5e7eb;">
+        <button id="tabReceived" class="tab-button active" style="padding: 12px 24px; background: none; border: none; border-bottom: 3px solid #667eea; color: #667eea; font-weight: 600; font-size: 14px; cursor: pointer;">
+          Reviews I Received
+        </button>
+        <button id="tabSubmitted" class="tab-button" style="padding: 12px 24px; background: none; border: none; border-bottom: 3px solid transparent; color: #6b7280; font-weight: 500; font-size: 14px; cursor: pointer;">
+          Reviews I Submitted
+        </button>
+      </div>
+    </div>
+
+    <!-- Student Selector for Instructors -->
+    <div id="studentSelectorContainer" class="dashboard-card" style="display: none; margin-bottom: 24px;">
+      <div class="card-header">
+        <h2 class="card-title">
+          <span class="card-icon">👥</span>
+          Select Student
+        </h2>
+      </div>
+      <div class="card-body">
+        <div class="form-input-wrapper">
+          <select id="studentSelect" class="form-select-enhanced">
+            <option value="">-- Select a student to view their results --</option>
+          </select>
+          <span class="input-icon">👤</span>
+        </div>
+        <div id="studentSelectMessage" class="msg" style="margin-top: 12px; display: none;"></div>
+      </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="dashboard-card" style="display: none; text-align: center; padding: 40px;">
+      <div class="report-loading-spinner" style="margin: 0 auto 16px;"></div>
+      <p>Loading peer review results...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="errorState" class="dashboard-card" style="display: none; text-align: center; padding: 40px;">
+      <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+      <p id="errorMessage" class="error"></p>
+    </div>
+
+    <!-- No Data State -->
+    <div id="noDataState" class="dashboard-card" style="display: none; text-align: center; padding: 40px;">
+      <div style="font-size: 48px; margin-bottom: 16px;">📋</div>
+      <p id="noDataMessage" style="color: #6b7280; font-size: 16px;"></p>
+    </div>
+
+    <!-- Results Content -->
+    <div id="resultsContent" style="display: none;">
+      <!-- Summary Card -->
+      <div class="dashboard-card" style="margin-bottom: 24px;">
+        <div class="card-header">
+          <h2 class="card-title">
+            <span class="card-icon">📊</span>
+            Summary
+          </h2>
+        </div>
+        <div class="card-body">
+          <div style="display: flex; gap: 32px; flex-wrap: wrap;">
+            <div>
+              <div style="font-size: 32px; font-weight: 600; color: #667eea;" id="totalReviewsCount">0</div>
+              <div style="color: #6b7280; font-size: 14px; margin-top: 4px;">Total Reviews</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reviews List -->
+      <div id="reviewsList" class="reviews-list-container"></div>
+    </div>
+
+    <!-- Submitted Reviews Content -->
+    <div id="submittedReviewsContent" style="display: none;">
+      <!-- Submitted Reviews List -->
+      <div id="submittedReviewsList" class="reviews-list-container"></div>
+    </div>
+  </div>
+
+  <script>
+    // API_BASE is already declared in protected.js, so we just use window.API_BASE directly
+    // or reference it if needed, but don't redeclare it
+
+
+    // Initialize page
+    document.addEventListener("DOMContentLoaded", () => {
+      const username = localStorage.getItem("username") || "User";
+      const role = localStorage.getItem("role") || "student";
+      
+      // Update user profile
+      const userNameDisplay = document.getElementById("userNameDisplay");
+      const userRoleDisplay = document.getElementById("userRoleDisplay");
+      const userInitial = document.getElementById("userInitial");
+      
+      if (userNameDisplay) userNameDisplay.textContent = username;
+      if (userRoleDisplay) userRoleDisplay.textContent = role.charAt(0).toUpperCase() + role.slice(1);
+      if (userInitial) userInitial.textContent = username.charAt(0).toUpperCase();
+
+      // Logout handler
+      document.getElementById("logoutBtn").addEventListener("click", () => {
+        localStorage.removeItem("isLoggedIn");
+        localStorage.removeItem("username");
+        localStorage.removeItem("role");
+        localStorage.removeItem("access_token");
+        window.location.href = "login.html";
+      });
+
+      // Allow both students and instructors to access results
+      if (role !== "student" && role !== "instructor") {
+        showError("This page is only available for students and instructors.");
+        return;
+      }
+
+      // Check for student_id in URL parameters (for viewing other students' results)
+      const urlParams = new URLSearchParams(window.location.search);
+      const studentIdFromUrl = urlParams.get('student_id');
+      
+      // If student_id is provided and user is a student, allow viewing that student's results
+      // (only after results are published)
+      if (role === "student" && studentIdFromUrl) {
+        // Hide student selector (not needed for students)
+        document.getElementById("studentSelectorContainer").style.display = "none";
+        
+        // Show loading state and load the specified student's results
+        const loadingState = document.getElementById("loadingState");
+        const errorState = document.getElementById("errorState");
+        const resultsContent = document.getElementById("resultsContent");
+        const noDataState = document.getElementById("noDataState");
+        
+        if (loadingState) loadingState.style.display = "block";
+        if (errorState) errorState.style.display = "none";
+        if (resultsContent) resultsContent.style.display = "none";
+        if (noDataState) noDataState.style.display = "none";
+        
+        // Update welcome text
+        document.getElementById("welcomeText").textContent = "Peer Review Results";
+        const subtitle = document.querySelector(".welcome-subtitle");
+        if (subtitle) {
+          subtitle.textContent = "View detailed peer review results";
+        }
+        
+        setTimeout(() => {
+          loadResults(studentIdFromUrl);
+        }, 100);
+        return;
+      }
+
+      // Update welcome text for instructors
+      if (role === "instructor") {
+        document.getElementById("welcomeText").textContent = "Peer Review Results (Read-Only)";
+        const subtitle = document.querySelector(".welcome-subtitle");
+        if (subtitle) {
+          subtitle.textContent = "View individual peer review results for students.";
+        }
+        
+        // Check for student_id in URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const studentIdFromUrl = urlParams.get('student_id');
+        
+        // Show student selector
+        document.getElementById("studentSelectorContainer").style.display = "block";
+        
+        // Hide loading state initially for instructors (they need to select a student first)
+        document.getElementById("loadingState").style.display = "none";
+        document.getElementById("errorState").style.display = "none";
+        document.getElementById("resultsContent").style.display = "none";
+        document.getElementById("noDataState").style.display = "none";
+        
+        // Load students (needed for selector dropdown)
+        loadStudents().then(() => {
+          // If student_id is in URL, select it and load the results
+          if (studentIdFromUrl) {
+            const studentSelect = document.getElementById("studentSelect");
+            if (studentSelect) {
+              studentSelect.value = studentIdFromUrl;
+            }
+            loadResults(studentIdFromUrl);
+          }
+        });
+        
+        // Handle student selection change
+        document.getElementById("studentSelect").addEventListener("change", () => {
+          const studentId = document.getElementById("studentSelect").value;
+          if (studentId) {
+            loadResults(studentId);
+          } else {
+            // Hide results content when no student selected
+            document.getElementById("resultsContent").style.display = "none";
+            document.getElementById("loadingState").style.display = "none";
+            document.getElementById("errorState").style.display = "none";
+            document.getElementById("noDataState").style.display = "none";
+          }
+        });
+      } else {
+        // For students accessing "My Reviews" - show only submitted reviews
+        // Hide tab navigation - we only show submitted reviews
+        const tabNav = document.getElementById("tabNavigation");
+        if (tabNav) {
+          tabNav.style.display = "none";
+        }
+        
+        // Show "View All Students Results" button in top right
+        const viewAllResultsBtn = document.getElementById("viewAllResultsBtn");
+        if (viewAllResultsBtn) {
+          viewAllResultsBtn.style.display = "flex";
+        }
+        
+        // Update welcome text for "My Reviews"
+        document.getElementById("welcomeText").textContent = "My Reviews";
+        const subtitle = document.querySelector(".welcome-subtitle");
+        if (subtitle) {
+          subtitle.textContent = "View reviews you submitted for your teammates";
+        }
+        
+        // Show loading state
+        const loadingState = document.getElementById("loadingState");
+        const errorState = document.getElementById("errorState");
+        const resultsContent = document.getElementById("resultsContent");
+        const submittedReviewsContent = document.getElementById("submittedReviewsContent");
+        const noDataState = document.getElementById("noDataState");
+        const studentSelector = document.getElementById("studentSelectorContainer");
+        
+        if (loadingState) loadingState.style.display = "block";
+        if (errorState) errorState.style.display = "none";
+        if (resultsContent) resultsContent.style.display = "none";
+        if (submittedReviewsContent) submittedReviewsContent.style.display = "none";
+        if (noDataState) noDataState.style.display = "none";
+        if (studentSelector) studentSelector.style.display = "none";
+        
+        // Load submitted reviews directly
+        setTimeout(() => {
+          loadSubmittedReviews();
+        }, 100);
+      }
+    });
+
+    async function loadStudents() {
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        console.error("No access token found");
+        showError("You are not logged in.");
+        return Promise.resolve();
+      }
+
+      const studentSelect = document.getElementById("studentSelect");
+      if (!studentSelect) {
+        console.error("Student select element not found");
+        return Promise.resolve();
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/instructor/students`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) {
+          console.error("Failed to load students:", res.status, res.statusText);
+          const errorData = await res.json().catch(() => ({}));
+          const errorMsg = errorData.detail || `Failed to load students (HTTP ${res.status})`;
+          
+          studentSelect.innerHTML = '<option value="">Error loading students</option>';
+          
+          // Show error message in the selector area
+          const messageEl = document.getElementById("studentSelectMessage");
+          if (messageEl) {
+            messageEl.textContent = errorMsg;
+            messageEl.className = "msg error";
+            messageEl.style.display = "block";
+          }
+          
+          return Promise.resolve();
+        }
+
+        const data = await res.json();
+        console.log("Students loaded:", data);
+        
+        studentSelect.innerHTML = '<option value="">-- Select a student to view their results --</option>';
+        
+        const messageEl = document.getElementById("studentSelectMessage");
+        
+        if (data.students && data.students.length > 0) {
+          data.students.forEach(student => {
+            const option = document.createElement("option");
+            option.value = student.id;
+            option.textContent = student.username || `Student ${student.id}`;
+            studentSelect.appendChild(option);
+          });
+          console.log(`Loaded ${data.students.length} students`);
+          
+          // Hide any previous messages
+          if (messageEl) {
+            messageEl.style.display = "none";
+            messageEl.textContent = "";
+          }
+        } else {
+          studentSelect.innerHTML = '<option value="">No students found</option>';
+          console.warn("No students found in response");
+          
+          // Show message
+          if (messageEl) {
+            messageEl.textContent = "No students found. Please ensure students are registered in the system.";
+            messageEl.className = "msg info";
+            messageEl.style.display = "block";
+          }
+        }
+        
+        return Promise.resolve();
+      } catch (err) {
+        console.error("Error loading students:", err);
+        studentSelect.innerHTML = '<option value="">Error loading students</option>';
+        
+        // Show error message in the selector area
+        const messageEl = document.getElementById("studentSelectMessage");
+        if (messageEl) {
+          messageEl.textContent = "Failed to load students. Please check your connection and try again.";
+          messageEl.className = "msg error";
+          messageEl.style.display = "block";
+        }
+        
+        return Promise.resolve();
+      }
+    }
+
+    async function loadResults(studentId = null) {
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        console.error("No access token found in localStorage");
+        hideLoading();
+        showError("You are not logged in.");
+        return;
+      }
+
+      const loadingState = document.getElementById("loadingState");
+      const errorState = document.getElementById("errorState");
+      const resultsContent = document.getElementById("resultsContent");
+      const noDataState = document.getElementById("noDataState");
+
+      // Always start by showing loading and hiding other states
+      loadingState.style.display = "block";
+      errorState.style.display = "none";
+      resultsContent.style.display = "none";
+      noDataState.style.display = "none";
+
+      try {
+        // Build URL with student_id parameter for instructors
+        let url = `${API_BASE}/peer-reviews/results`;
+        if (studentId) {
+          url += `?student_id=${studentId}`;
+        }
+
+        console.log("Fetching results from:", url);
+
+        // Add timeout to prevent hanging
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+        let res;
+        try {
+          res = await fetch(url, {
+            method: "GET",
+            headers: {
+              "Authorization": `Bearer ${token}`,
+            },
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          console.error("Fetch error:", fetchError);
+          
+          hideLoading();
+          
+          if (fetchError.name === 'AbortError') {
+            showError("Request timed out. The backend server may not be responding.");
+            return;
+          }
+          if (fetchError.message && (fetchError.message.includes("Failed to fetch") || fetchError.message.includes("NetworkError"))) {
+            showError(`Backend server not responding. Please ensure the backend is running on ${API_BASE}.`);
+            return;
+          }
+          showError("Network error occurred. Please check your connection and try again.");
+          return;
+        }
+
+        console.log("Results fetch response status:", res.status, res.statusText);
+
+        // Handle HTTP error status codes
+        if (!res.ok) {
+          hideLoading();
+          
+          let errorMessage = "Failed to load peer review results.";
+          
+          if (res.status === 403) {
+            const errorData = await res.json().catch(() => ({}));
+            if (errorData.detail && errorData.detail.toLowerCase().includes("not been published")) {
+              errorMessage = "Results have not been published yet. Please wait for the instructor to publish results.";
+            } else {
+              errorMessage = "Access denied.";
+            }
+          } else if (res.status === 401) {
+            errorMessage = "You are not logged in.";
+            localStorage.removeItem("access_token");
+            localStorage.removeItem("isLoggedIn");
+          } else if (res.status === 404) {
+            errorMessage = "Results endpoint not found.";
+          } else {
+            const errorData = await res.json().catch(() => ({}));
+            errorMessage = errorData.detail || `Failed to load results (HTTP ${res.status})`;
+          }
+          
+          showError(errorMessage);
+          return;
+        }
+
+        const data = await res.json();
+        console.log("Results data received:", data);
+
+        // Check if selection is required (for instructors)
+        if (data && data.requires_selection) {
+          hideLoading();
+          resultsContent.style.display = "none";
+          errorState.style.display = "none";
+          noDataState.style.display = "none";
+          return;
+        }
+
+        // Check if we have valid data
+        if (!data) {
+          hideLoading();
+          showError("No results data received from server.");
+          return;
+        }
+
+        // Check if there are no reviews
+        if (!data.reviews || data.reviews.length === 0) {
+          hideLoading();
+          resultsContent.style.display = "none";
+          errorState.style.display = "none";
+          noDataState.style.display = "block";
+          const noDataMessage = document.getElementById("noDataMessage");
+          if (noDataMessage) {
+            noDataMessage.textContent = data.message || "No peer reviews received yet.";
+          }
+          return;
+        }
+
+        // Success: Hide loading, show content
+        hideLoading();
+        errorState.style.display = "none";
+        noDataState.style.display = "none";
+        resultsContent.style.display = "block";
+
+        console.log("Displaying results content");
+        // Display results data
+        try {
+          displayResults(data);
+        } catch (displayError) {
+          console.error("Error in displayResults:", displayError);
+          resultsContent.style.display = "none";
+          showError("Failed to display results data. Please check the console for details.");
+        }
+
+      } catch (err) {
+        console.error("Error loading results:", err);
+        hideLoading();
+        showError("Failed to load peer review results. Please try again later.");
+      }
+    }
+
+    function hideLoading() {
+      const loadingState = document.getElementById("loadingState");
+      if (loadingState) {
+        loadingState.style.display = "none";
+      }
+    }
+
+    function displayResults(data) {
+      if (!data || !data.reviews) {
+        console.error("No data or reviews provided to displayResults");
+        showError("No results data available.");
+        return;
+      }
+
+      console.log("displayResults called with data:", data);
+
+      // Update total reviews count
+      const totalReviewsEl = document.getElementById("totalReviewsCount");
+      if (totalReviewsEl) {
+        totalReviewsEl.textContent = data.total_reviews || data.reviews.length || 0;
+      }
+
+      // Display reviews
+      const reviewsList = document.getElementById("reviewsList");
+      if (!reviewsList) {
+        console.error("reviewsList element not found");
+        return;
+      }
+
+      reviewsList.innerHTML = "";
+
+      data.reviews.forEach((review, index) => {
+        const reviewCard = document.createElement("div");
+        reviewCard.className = "dashboard-card";
+        reviewCard.style.marginBottom = "24px";
+
+        // Reviewer name (or anonymous if configured)
+        const reviewerName = review.reviewer_username || "Anonymous";
+        
+        // Format submitted date
+        const submittedDate = review.submitted_at ? new Date(review.submitted_at).toLocaleDateString() : "Unknown";
+
+        // Calculate score color
+        const totalScore = review.total_score || 0;
+        let scoreColor = "#6b7280";
+        if (totalScore >= 4) {
+          scoreColor = "#10b981"; // green
+        } else if (totalScore >= 3) {
+          scoreColor = "#f59e0b"; // amber
+        } else {
+          scoreColor = "#ef4444"; // red
+        }
+
+        // Build ratings HTML
+        let ratingsHTML = "";
+        if (review.ratings && review.ratings.length > 0) {
+          ratingsHTML = review.ratings.map(rating => {
+            const ratingValue = rating.rating || 0;
+            const maxRating = rating.scale_max || 5;
+            const percentage = (ratingValue / maxRating) * 100;
+            
+            let ratingColor = "#6b7280";
+            if (ratingValue >= 4) {
+              ratingColor = "#10b981";
+            } else if (ratingValue >= 3) {
+              ratingColor = "#f59e0b";
+            } else {
+              ratingColor = "#ef4444";
+            }
+
+            return `
+              <div style="padding: 16px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 12px; background: #f9fafb;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                  <div style="flex: 1;">
+                    <div style="font-weight: 600; color: #1f2937; font-size: 15px; margin-bottom: 4px;">
+                      ${rating.criterion_title}
+                    </div>
+                    <div style="font-size: 12px; color: #6b7280;">
+                      Weight: ${rating.criterion_weight.toFixed(2)}
+                    </div>
+                  </div>
+                  <div style="text-align: right; margin-left: 16px;">
+                    <div style="font-size: 28px; font-weight: bold; color: ${ratingColor};">
+                      ${ratingValue}
+                    </div>
+                    <div style="font-size: 11px; color: #6b7280;">out of ${maxRating}</div>
+                  </div>
+                </div>
+                <div style="background: #e5e7eb; border-radius: 4px; height: 6px; overflow: hidden;">
+                  <div style="background: ${ratingColor}; height: 100%; width: ${percentage}%; transition: width 0.3s ease;"></div>
+                </div>
+              </div>
+            `;
+          }).join("");
+        } else {
+          ratingsHTML = '<p style="color: #6b7280; padding: 16px; text-align: center;">No ratings available</p>';
+        }
+
+        reviewCard.innerHTML = `
+          <div class="card-header">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <h2 class="card-title">
+                <span class="card-icon">👤</span>
+                Review from ${reviewerName}
+              </h2>
+              <div style="text-align: right;">
+                <div style="font-size: 32px; font-weight: bold; color: ${scoreColor};">
+                  ${totalScore.toFixed(2)}
+                </div>
+                <div style="font-size: 12px; color: #6b7280;">Total Score</div>
+              </div>
+            </div>
+            <div style="font-size: 12px; color: #6b7280; margin-top: 8px;">
+              Submitted on ${submittedDate}
+            </div>
+          </div>
+          <div class="card-body">
+            <div style="margin-bottom: 16px;">
+              <h3 style="font-size: 16px; font-weight: 600; color: #1f2937; margin-bottom: 12px;">
+                Ratings by Criterion
+              </h3>
+              ${ratingsHTML}
+            </div>
+          </div>
+        `;
+
+        reviewsList.appendChild(reviewCard);
+      });
+    }
+
+    function showError(message) {
+      hideLoading();
+      
+      const errorState = document.getElementById("errorState");
+      const resultsContent = document.getElementById("resultsContent");
+      const noDataState = document.getElementById("noDataState");
+      const errorMessageEl = document.getElementById("errorMessage");
+
+      if (resultsContent) {
+        resultsContent.style.display = "none";
+      }
+      if (noDataState) {
+        noDataState.style.display = "none";
+      }
+      if (errorState) {
+        errorState.style.display = "block";
+      }
+      if (errorMessageEl) {
+        errorMessageEl.textContent = message;
+      }
+      
+      console.error("Showing error to user:", message);
+    }
+
+    async function loadSubmittedReviews() {
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        console.error("No access token found in localStorage");
+        showError("You are not logged in.");
+        return;
+      }
+
+      const loadingState = document.getElementById("loadingState");
+      const errorState = document.getElementById("errorState");
+      const submittedReviewsContent = document.getElementById("submittedReviewsContent");
+      const noDataState = document.getElementById("noDataState");
+
+      // Always start by showing loading and hiding other states
+      loadingState.style.display = "block";
+      errorState.style.display = "none";
+      submittedReviewsContent.style.display = "none";
+      noDataState.style.display = "none";
+
+      try {
+        const url = `${API_BASE}/peer-reviews/my-submitted-reviews`;
+
+        console.log("Fetching submitted reviews from:", url);
+
+        // Add timeout to prevent hanging
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+        let res;
+        try {
+          res = await fetch(url, {
+            method: "GET",
+            headers: {
+              "Authorization": `Bearer ${token}`,
+            },
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          console.error("Fetch error:", fetchError);
+          
+          hideLoading();
+          
+          if (fetchError.name === 'AbortError') {
+            showError("Request timed out. The backend server may not be responding.");
+            return;
+          }
+          if (fetchError.message && (fetchError.message.includes("Failed to fetch") || fetchError.message.includes("NetworkError"))) {
+            showError(`Backend server not responding. Please ensure the backend is running on ${API_BASE}.`);
+            return;
+          }
+          showError("Network error occurred. Please check your connection and try again.");
+          return;
+        }
+
+        console.log("Submitted reviews fetch response status:", res.status, res.statusText);
+
+        // Handle HTTP error status codes
+        if (!res.ok) {
+          hideLoading();
+          
+          let errorMessage = "Failed to load submitted reviews.";
+          
+          if (res.status === 401) {
+            errorMessage = "You are not logged in.";
+            localStorage.removeItem("access_token");
+            localStorage.removeItem("isLoggedIn");
+          } else if (res.status === 404) {
+            errorMessage = "Endpoint not found.";
+          } else {
+            const errorData = await res.json().catch(() => ({}));
+            errorMessage = errorData.detail || `Failed to load submitted reviews (HTTP ${res.status})`;
+          }
+          
+          showError(errorMessage);
+          return;
+        }
+
+        const data = await res.json();
+        console.log("Submitted reviews data received:", data);
+
+        // Check if we have valid data
+        if (!data) {
+          hideLoading();
+          showError("No data received from server.");
+          return;
+        }
+
+        // Check if there are no reviews
+        if (!data.reviews || data.reviews.length === 0) {
+          console.log("No reviews found in response");
+          hideLoading();
+          submittedReviewsContent.style.display = "none";
+          errorState.style.display = "none";
+          noDataState.style.display = "block";
+          const noDataMessage = document.getElementById("noDataMessage");
+          if (noDataMessage) {
+            noDataMessage.textContent = data.message || "You haven't submitted any reviews yet.";
+          }
+          console.log("Showing no data state");
+          return;
+        }
+        
+        console.log(`Found ${data.reviews.length} reviews, proceeding to display`);
+
+        // Success: Hide loading, show content
+        hideLoading();
+        errorState.style.display = "none";
+        noDataState.style.display = "none";
+        submittedReviewsContent.style.display = "block";
+
+        console.log("Displaying submitted reviews content");
+        // Display submitted reviews data
+        try {
+          displaySubmittedReviews(data);
+          console.log("Successfully displayed submitted reviews");
+        } catch (displayError) {
+          console.error("Error in displaySubmittedReviews:", displayError);
+          console.error("Display error stack:", displayError.stack);
+          hideLoading();
+          submittedReviewsContent.style.display = "none";
+          showError("Failed to display submitted reviews data. Please check the console for details.");
+        }
+
+      } catch (err) {
+        console.error("Error loading submitted reviews:", err);
+        hideLoading();
+        showError("Failed to load submitted reviews. Please try again later.");
+      }
+    }
+
+    function displaySubmittedReviews(data) {
+      console.log("displaySubmittedReviews called with data:", data);
+      
+      if (!data) {
+        console.error("No data provided to displaySubmittedReviews");
+        showError("No submitted reviews data available.");
+        return;
+      }
+      
+      if (!data.reviews || !Array.isArray(data.reviews)) {
+        console.error("No reviews array in data:", data);
+        showError("No submitted reviews found. You haven't submitted any reviews yet.");
+        return;
+      }
+      
+      console.log(`Found ${data.reviews.length} submitted reviews to display`);
+
+      // Display submitted reviews
+      const submittedReviewsList = document.getElementById("submittedReviewsList");
+      if (!submittedReviewsList) {
+        console.error("submittedReviewsList element not found");
+        return;
+      }
+
+      submittedReviewsList.innerHTML = "";
+
+      data.reviews.forEach((review, index) => {
+        const reviewCard = document.createElement("div");
+        reviewCard.className = "dashboard-card";
+        reviewCard.style.marginBottom = "24px";
+
+        // Reviewee name (who was reviewed)
+        const revieweeName = review.reviewee_username || "Unknown";
+        
+        // Format submitted date
+        const submittedDate = review.submitted_at ? new Date(review.submitted_at).toLocaleDateString() : "Unknown";
+
+        // Calculate score color
+        const totalScore = review.total_score || 0;
+        let scoreColor = "#6b7280";
+        if (totalScore >= 4) {
+          scoreColor = "#10b981"; // green
+        } else if (totalScore >= 3) {
+          scoreColor = "#f59e0b"; // amber
+        } else {
+          scoreColor = "#ef4444"; // red
+        }
+
+        // Build ratings HTML
+        let ratingsHTML = "";
+        if (review.ratings && review.ratings.length > 0) {
+          ratingsHTML = review.ratings.map(rating => {
+            const ratingValue = rating.rating || 0;
+            const maxRating = rating.scale_max || 5;
+            const percentage = (ratingValue / maxRating) * 100;
+            
+            let ratingColor = "#6b7280";
+            if (ratingValue >= 4) {
+              ratingColor = "#10b981";
+            } else if (ratingValue >= 3) {
+              ratingColor = "#f59e0b";
+            } else {
+              ratingColor = "#ef4444";
+            }
+
+            return `
+              <div style="padding: 16px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 12px; background: #f9fafb;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                  <div style="flex: 1;">
+                    <div style="font-weight: 600; color: #1f2937; font-size: 15px; margin-bottom: 4px;">
+                      ${rating.criterion_title}
+                    </div>
+                    <div style="font-size: 12px; color: #6b7280;">
+                      Weight: ${rating.criterion_weight.toFixed(2)}
+                    </div>
+                  </div>
+                  <div style="text-align: right; margin-left: 16px;">
+                    <div style="font-size: 28px; font-weight: bold; color: ${ratingColor};">
+                      ${ratingValue}
+                    </div>
+                    <div style="font-size: 11px; color: #6b7280;">out of ${maxRating}</div>
+                  </div>
+                </div>
+                <div style="background: #e5e7eb; border-radius: 4px; height: 6px; overflow: hidden;">
+                  <div style="background: ${ratingColor}; height: 100%; width: ${percentage}%; transition: width 0.3s ease;"></div>
+                </div>
+              </div>
+            `;
+          }).join("");
+        } else {
+          ratingsHTML = '<p style="color: #6b7280; padding: 16px; text-align: center;">No ratings available</p>';
+        }
+
+        reviewCard.innerHTML = `
+          <div class="card-header">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <h2 class="card-title">
+                <span class="card-icon">👤</span>
+                Review for ${revieweeName}
+              </h2>
+              <div style="text-align: right;">
+                <div style="font-size: 32px; font-weight: bold; color: ${scoreColor};">
+                  ${totalScore.toFixed(2)}
+                </div>
+                <div style="font-size: 12px; color: #6b7280;">Total Score</div>
+              </div>
+            </div>
+            <div style="font-size: 12px; color: #6b7280; margin-top: 8px;">
+              Submitted on ${submittedDate}
+            </div>
+          </div>
+          <div class="card-body">
+            <div style="margin-bottom: 16px;">
+              <h3 style="font-size: 16px; font-weight: 600; color: #1f2937; margin-bottom: 12px;">
+                Ratings by Criterion
+              </h3>
+              ${ratingsHTML}
+            </div>
+          </div>
+        `;
+
+        submittedReviewsList.appendChild(reviewCard);
+      });
+    }
+  </script>
+</body>
+</html>
