@@ -1,10 +1,13 @@
 import re
 import sqlite3
+import io
+from datetime import datetime
 from typing import Optional, Callable
 
 from fastapi import FastAPI, Depends, HTTPException, Header, APIRouter, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator, model_validator
+from fastapi.responses import StreamingResponse
 
 import db
 from security import hash_password, verify_password
@@ -15,6 +18,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 from fastapi.responses import FileResponse
 from pathlib import Path
+
+# PDF generation imports
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 
 app = FastAPI(title="PeerEval Pro - Role Based Access")
 BASE_DIR = Path(__file__).resolve().parent          # .../backend
@@ -684,6 +694,132 @@ def get_personal_report(
         "total_reviews": len(reviews),
         "unique_reviewers": len(set(r["reviewer_id"] for r in reviews)),
     }
+
+
+@peer_review_router.get("/report/pdf")
+def download_report_pdf(user=Depends(require_roles("student"))):
+    """
+    Download personal peer review report as a PDF.
+    Only available for students after results are published.
+    Students can only download their own report.
+    """
+    # Check if results are published
+    if not db.are_results_published():
+        raise HTTPException(
+            status_code=403,
+            detail="Results have not been published yet. Please wait for the instructor to publish results."
+        )
+    
+    # Get student info
+    student = db.get_user_by_username(user["username"])
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    
+    student_id = student["id"]
+    
+    # Get all reviews for this student
+    reviews = db.get_peer_reviews_for_student(student_id)
+    
+    # Get criteria
+    criteria = db.get_peer_review_criteria()
+    
+    # Calculate scores per criterion
+    criterion_scores = {}
+    for review in reviews:
+        cid = review["criterion_id"]
+        if cid not in criterion_scores:
+            criterion_scores[cid] = {
+                "title": review["criterion_title"],
+                "weight": float(review.get("criterion_weight", 1.0)),
+                "ratings": [],
+            }
+        criterion_scores[cid]["ratings"].append(review["rating"])
+    
+    # Calculate averages
+    criterion_results = []
+    total_weighted = 0.0
+    total_weight = 0.0
+    for cid, data in criterion_scores.items():
+        avg = sum(data["ratings"]) / len(data["ratings"]) if data["ratings"] else 0
+        criterion_results.append({
+            "title": data["title"],
+            "weight": data["weight"],
+            "average": round(avg, 2),
+            "count": len(data["ratings"]),
+        })
+        total_weighted += avg * data["weight"]
+        total_weight += data["weight"]
+    
+    overall_score = round(total_weighted / total_weight, 2) if total_weight > 0 else 0
+    
+    # Generate PDF
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.75*inch, bottomMargin=0.75*inch)
+    styles = getSampleStyleSheet()
+    
+    # Custom styles
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=22, spaceAfter=6, textColor=colors.HexColor('#1e293b'))
+    subtitle_style = ParagraphStyle('Subtitle', parent=styles['Normal'], fontSize=12, textColor=colors.HexColor('#64748b'), spaceAfter=20)
+    heading_style = ParagraphStyle('Heading', parent=styles['Heading2'], fontSize=14, spaceBefore=20, spaceAfter=10, textColor=colors.HexColor('#334155'))
+    
+    elements = []
+    
+    # Title
+    elements.append(Paragraph("Peer Review Report", title_style))
+    elements.append(Paragraph(f"Generated for: <b>{student['username']}</b>", subtitle_style))
+    elements.append(Paragraph(f"Date: {datetime.now().strftime('%B %d, %Y at %H:%M')}", subtitle_style))
+    elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#e2e8f0'), spaceAfter=20))
+    
+    # Overall Score
+    elements.append(Paragraph("Overall Performance", heading_style))
+    score_color = colors.HexColor('#10b981') if overall_score >= 4 else (colors.HexColor('#f59e0b') if overall_score >= 3 else colors.HexColor('#ef4444'))
+    elements.append(Paragraph(f"<font size='28' color='{score_color.hexval()}'><b>{overall_score}</b></font> <font size='12' color='#64748b'>/ 5.0</font>", styles['Normal']))
+    elements.append(Paragraph(f"Based on {len(reviews)} ratings from {len(set(r['reviewer_id'] for r in reviews))} reviewers", subtitle_style))
+    elements.append(Spacer(1, 20))
+    
+    # Criterion Scores Table
+    if criterion_results:
+        elements.append(Paragraph("Scores by Criterion", heading_style))
+        
+        table_data = [["Criterion", "Weight", "Avg Score", "Reviews"]]
+        for cr in criterion_results:
+            table_data.append([cr["title"], f"{cr['weight']:.1f}", f"{cr['average']:.2f}", str(cr["count"])])
+        
+        table = Table(table_data, colWidths=[3*inch, 1*inch, 1*inch, 1*inch])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f1f5f9')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#334155')),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 11),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('TOPPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+            ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor('#1e293b')),
+            ('FONTSIZE', (0, 1), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 10),
+            ('TOPPADDING', (0, 1), (-1, -1), 10),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+            ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+        ]))
+        elements.append(table)
+    else:
+        elements.append(Paragraph("No reviews received yet.", styles['Normal']))
+    
+    # Footer
+    elements.append(Spacer(1, 40))
+    elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#e2e8f0'), spaceAfter=10))
+    elements.append(Paragraph(f"<font size='9' color='#94a3b8'>PeerEval Pro - Confidential Report</font>", styles['Normal']))
+    
+    doc.build(elements)
+    buffer.seek(0)
+    
+    filename = f"peer_review_report_{student['username']}_{datetime.now().strftime('%Y%m%d')}.pdf"
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
 @peer_review_router.get("/results")

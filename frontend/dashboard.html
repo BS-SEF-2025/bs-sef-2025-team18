@@ -266,12 +266,20 @@
       <!-- Peer Review Report Card (only for students) -->
       <section id="studentReportCard" class="dashboard-card">
         <div class="card-header">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
             <h2 class="card-title">
               <span class="card-icon">📊</span>
               Peer Review Report
             </h2>
-            <div style="display: flex; gap: 12px; align-items: center;">
+            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+              <button id="downloadPdfBtn" type="button" style="display: none; padding: 8px 16px; background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%); border: none; border-radius: 8px; color: white; font-size: 13px; font-weight: 600; cursor: pointer; align-items: center; gap: 6px; transition: all 0.2s ease; box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='translateY(0)'">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Download PDF
+              </button>
               <a href="results.html" style="text-decoration: none; color: #667eea; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 6px;">
                 <span>My Reviews</span>
                 <span>→</span>
@@ -753,6 +761,9 @@
         // Display report preview
         displayReportPreview(data);
         
+        // Show PDF download button
+        showPdfDownloadButton();
+
         // Hide refresh button if report is showing
         const refreshBtn = document.getElementById("refreshReportBtn");
         if (refreshBtn) {
@@ -763,6 +774,68 @@
         console.error("Error loading report preview:", err);
         hideReportLoading();
         showReportError("An error occurred while loading your report.");
+      }
+    }
+
+    // Show PDF download button when report is displayed
+    function showPdfDownloadButton() {
+      const downloadBtn = document.getElementById("downloadPdfBtn");
+      if (downloadBtn) {
+        downloadBtn.style.display = "inline-flex";
+        downloadBtn.onclick = downloadReportPdf;
+      }
+    }
+
+    async function downloadReportPdf() {
+      const token = localStorage.getItem("access_token");
+      const downloadBtn = document.getElementById("downloadPdfBtn");
+      
+      if (!token) {
+        alert("You are not logged in.");
+        return;
+      }
+      
+      // Disable button during download
+      const originalHTML = downloadBtn.innerHTML;
+      downloadBtn.disabled = true;
+      downloadBtn.innerHTML = '<span style="display: inline-flex; align-items: center; gap: 6px;"><span class="report-loading-spinner" style="width: 14px; height: 14px; border-width: 2px;"></span> Generating...</span>';
+      
+      try {
+        const res = await fetch(`${window.BACKEND_URL}/peer-reviews/report/pdf`, {
+          method: "GET",
+          headers: { "Authorization": `Bearer ${token}` },
+        });
+        
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          alert(errorData.detail || "Failed to download PDF.");
+          return;
+        }
+        
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        
+        const contentDisposition = res.headers.get("Content-Disposition");
+        let filename = "peer_review_report.pdf";
+        if (contentDisposition) {
+          const match = contentDisposition.match(/filename=(.+)/);
+          if (match) filename = match[1];
+        }
+        
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+      } catch (err) {
+        console.error("Error downloading PDF:", err);
+        alert("Failed to download PDF. Please try again.");
+      } finally {
+        downloadBtn.disabled = false;
+        downloadBtn.innerHTML = originalHTML;
       }
     }
 
