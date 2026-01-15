@@ -36,6 +36,34 @@ app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 def landing():
     return FileResponse(FRONTEND_DIR / "index.html")
 
+@app.get("/login.html", include_in_schema=False)
+def login_page():
+    return FileResponse(FRONTEND_DIR / "login.html")
+
+@app.get("/signup.html", include_in_schema=False)
+def signup_page():
+    return FileResponse(FRONTEND_DIR / "signup.html")
+
+@app.get("/dashboard.html", include_in_schema=False)
+def dashboard_page():
+    return FileResponse(FRONTEND_DIR / "dashboard.html")
+
+@app.get("/styles.css", include_in_schema=False)
+def styles_css():
+    return FileResponse(FRONTEND_DIR / "styles.css")
+
+@app.get("/protected.js", include_in_schema=False)
+def protected_js():
+    return FileResponse(FRONTEND_DIR / "protected.js")
+
+@app.get("/signup.js", include_in_schema=False)
+def signup_js():
+    return FileResponse(FRONTEND_DIR / "signup.js")
+
+@app.get("/index.html", include_in_schema=False)
+def index_page():
+    return FileResponse(FRONTEND_DIR / "index.html")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
