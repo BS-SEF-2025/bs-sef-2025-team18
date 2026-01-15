@@ -163,6 +163,11 @@ You have two options to run the frontend:
   - Gradient background with card-based layout
   - Clear error and success messages
 
+- **Evaluation Criteria Management (Instructor-only):**
+  - Create, edit, and delete evaluation criteria
+  - State-aware: criteria can only be edited when review is in "draft" state
+  - Advanced modal form for adding new criteria with validation
+
 ### Frontend Configuration
 
 The backend URL is configured globally in each HTML file:
@@ -194,6 +199,78 @@ All scripts use this global variable to avoid hardcoding URLs.
 - Check that a teammate is selected
 - Review browser console for validation errors
 
+## Evaluation Criteria User Story
+
+### Real-Life UI/Flow Description
+
+Instructor opens the 'Evaluation Criteria' page, clicks 'Add Criterion', enters a criterion name and description (e.g., 'Teamwork' + explanation), and can edit criteria as long as the review hasn't started yet. Once the review starts or results are published, the criteria become read-only (edit controls disabled/hidden) so the rules can't change after students begin reviewing or after publication.
+
+**Scenario:** An instructor wants to set up evaluation criteria for peer reviews before students begin their reviews.
+
+**Step-by-Step Flow:**
+
+1. **Accessing the Criteria Section:**
+   - Instructor logs in and navigates to the Dashboard
+   - In the "Instructor Controls" section, they see the "Evaluation Criteria" card
+   - The section displays a title "Evaluation Criteria" with a brief description
+   - An "Add New Criterion" button is prominently displayed on the right
+
+2. **Creating a New Criterion:**
+   - Instructor clicks the "Add New Criterion" button
+   - A beautiful, animated modal window slides in from the center of the screen
+   - The modal has a backdrop blur effect and dark overlay
+   - The form includes:
+     - **Criterion Name field:** Text input with placeholder (e.g., "Teamwork", "Contribution", "Quality")
+       - Shows helper text: "A short, descriptive name for this criterion"
+       - Required field (marked with red asterisk)
+       - Maximum 200 characters
+     - **Description field:** Multi-line textarea for detailed explanation
+       - Shows helper text: "Explain what students should consider when rating this criterion"
+       - Real-time character counter (0/1000) with color warnings
+       - Counter turns yellow at 900+ characters, red at 950+ characters
+       - Required field (marked with red asterisk)
+       - Maximum 1000 characters
+   - Form validation shows errors in a highlighted error box if fields are empty
+   - Instructor enters:
+     - Name: "Teamwork"
+     - Description: "Evaluate the student's ability to collaborate effectively, communicate clearly, and contribute meaningfully to team discussions and projects."
+
+3. **Submitting the Criterion:**
+   - Instructor clicks "Create Criterion" button (with gradient styling)
+   - Button shows loading state ("Creating..." with spinner)
+   - On success:
+     - Modal closes automatically
+     - Success message appears below the "Add New Criterion" button: "✓ Criterion created successfully!"
+     - Message automatically disappears after 5 seconds
+
+4. **State-Aware Behavior:**
+   - **Before Review Starts (Draft State):**
+     - "Add New Criterion" button is fully enabled and clickable
+     - Instructor can create, edit, and delete criteria freely
+   - **After Review Starts or Results Published:**
+     - "Add New Criterion" button becomes disabled (grayed out, 50% opacity)
+     - Button shows tooltip: "Cannot add criteria when review state is 'started'/'published'. Only allowed in 'draft' state."
+     - Clicking the button does nothing
+     - All criteria become read-only to ensure fairness and consistency
+
+5. **Error Handling:**
+   - Network errors show clear messages in the modal
+   - Validation errors appear inline with the form
+   - Backend errors (e.g., duplicate name) display user-friendly messages
+   - Modal can be closed by:
+     - Clicking the "X" button in the top-right
+     - Clicking "Cancel" button
+     - Clicking outside the modal (on the backdrop)
+     - Pressing the Escape key
+
+**Key Design Principles:**
+- **Locked When Active:** Once students begin reviewing or results are published, criteria cannot be modified
+- **Prevent Rule Changes:** This ensures fairness - students review based on consistent criteria that don't change mid-process
+- **Intuitive UI:** Modern modal design with clear validation and feedback
+- **State Visibility:** Button state clearly indicates when criteria editing is allowed
+
+This workflow ensures that evaluation criteria are established upfront and remain consistent throughout the peer review process, maintaining fairness and preventing confusion.
+
 ### Development Notes
 
 - Database file: `backend/app.db` (SQLite)
@@ -201,3 +278,5 @@ All scripts use this global variable to avoid hardcoding URLs.
 - Server binds to `127.0.0.1:8000` (localhost only, not accessible from network)
 - Frontend uses localStorage for authentication tokens
 - All API calls include `Authorization: Bearer <token>` header
+- Criteria management endpoints: `/criteria` (POST, GET, PUT, DELETE)
+- Review state management: `/review/state` (GET, POST) - controls when criteria can be edited

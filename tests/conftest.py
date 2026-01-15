@@ -1,6 +1,13 @@
 import os
+import sys
 import pytest
+from pathlib import Path
 from fastapi.testclient import TestClient
+
+# Add backend directory to path so imports work
+backend_dir = Path(__file__).parent.parent / "backend"
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
 
 from backend.main import app
 from backend import db
@@ -17,6 +24,9 @@ def client(tmp_path, monkeypatch):
     # Ensure clean DB file
     if os.path.exists(test_db_path):
         os.remove(test_db_path)
+
+    # Initialize the database before app starts (so tables exist for startup event)
+    db.init_db()
 
     with TestClient(app) as c:
         yield c

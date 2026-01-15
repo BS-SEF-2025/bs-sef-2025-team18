@@ -256,6 +256,11 @@
       const formData = await formRes.json();
       criteria = formData.criteria || [];
 
+      console.log("Loaded criteria:", criteria.length, "items");
+      if (criteria.length > 0) {
+        console.log("Sample criterion:", criteria[0]);
+      }
+
       if (criteria.length === 0) {
         if (ratingContainer) {
           ratingContainer.innerHTML = '<p class="muted">No criteria available.</p>';
@@ -263,7 +268,7 @@
         return;
       }
 
-      // Render rating inputs
+      // Render rating inputs (render ALL criteria, no slice)
       renderRatingInputs();
       
       // Setup validation listeners after rendering
@@ -340,6 +345,51 @@
     }
   });
 
+  // Expose a global function to refresh the rating form
+  async function refreshRatingForm() {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      console.warn("Cannot refresh rating form: not authenticated");
+      return;
+    }
+
+    const ratingContainer = document.getElementById("ratingContainer");
+    if (!ratingContainer) {
+      console.warn("Cannot refresh rating form: rating container not found");
+      return;
+    }
+
+    try {
+      const formRes = await fetch(`${BACKEND_URL}/peer-reviews/form`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+
+      if (!formRes.ok) {
+        console.error(`Failed to refresh criteria: HTTP ${formRes.status}`);
+        return;
+      }
+
+      const formData = await formRes.json();
+      criteria = formData.criteria || [];
+
+      console.log("Refreshed criteria:", criteria.length, "items");
+      if (criteria.length > 0) {
+        console.log("Sample criterion:", criteria[0]);
+      }
+
+      // Re-render rating inputs with updated criteria (render ALL, no slice)
+      renderRatingInputs();
+    } catch (e) {
+      console.error("Failed to refresh rating form:", e);
+    }
+  }
+
+  // Make refreshRatingForm globally accessible
+  window.refreshRatingForm = refreshRatingForm;
+
   function renderRatingInputs() {
     const ratingContainer = document.getElementById("ratingContainer");
     if (!ratingContainer) return;
@@ -351,15 +401,32 @@
       return;
     }
 
+    // Render ALL criteria (no slice, no hardcoded limits)
     criteria.forEach(criterion => {
       const criterionDiv = document.createElement("div");
       criterionDiv.className = "criterion-group";
+      // Add unique identifier for debugging and proper rendering
+      criterionDiv.setAttribute("data-criterion-id", criterion.id);
+      criterionDiv.id = `criterion-${criterion.id}`;
 
       const label = document.createElement("label");
       label.className = "criterion-label";
-      label.textContent = criterion.title;
+      // Use criterion.title (from backend) - ensure it's not hardcoded
+      label.textContent = criterion.title || criterion.name || "Unnamed Criterion";
       if (criterion.required) {
         label.innerHTML += ' <span class="required">*</span>';
+      }
+
+      // Add description if available
+      if (criterion.description) {
+        const descriptionEl = document.createElement("p");
+        descriptionEl.className = "criterion-description";
+        descriptionEl.textContent = criterion.description;
+        descriptionEl.style.cssText = "font-size: 13px; color: #64748b; margin: 6px 0 12px 0; line-height: 1.5;";
+        criterionDiv.appendChild(label);
+        criterionDiv.appendChild(descriptionEl);
+      } else {
+        criterionDiv.appendChild(label);
       }
 
       const ratingGroup = document.createElement("div");
@@ -387,7 +454,6 @@
         ratingGroup.appendChild(labelEl);
       }
 
-      criterionDiv.appendChild(label);
       criterionDiv.appendChild(ratingGroup);
       ratingContainer.appendChild(criterionDiv);
     });
