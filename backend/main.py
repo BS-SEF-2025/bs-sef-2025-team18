@@ -1,4 +1,5 @@
 import re
+import sqlite3
 from typing import Optional, Callable
 
 from fastapi import FastAPI, Depends, HTTPException, Header, APIRouter, Query
@@ -9,17 +10,30 @@ import db
 from security import hash_password, verify_password
 from token_service import create_access_token, decode_access_token
 from seed import seed_users, seed_peer_review_criteria
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse
+from pathlib import Path
 
 app = FastAPI(title="PeerEval Pro - Role Based Access")
+BASE_DIR = Path(__file__).resolve().parent          # .../backend
+FRONTEND_DIR = BASE_DIR.parent / "frontend"
 
-# ✅ CORS (allow all origins for development)
+app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
+
+@app.get("/", include_in_schema=False)
+def landing():
+    return FileResponse(FRONTEND_DIR / "index.html")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for development
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # ✅ Init DB + seed only after app starts
 @app.on_event("startup")
@@ -280,44 +294,106 @@ peer_review_router = APIRouter(prefix="/peer-reviews", tags=["peer-reviews"])
 @peer_review_router.get("/form")
 def get_peer_review_form(user=Depends(require_roles("student"))):
     teammates = db.get_student_teammates_except(user["username"])
-    criteria = db.get_peer_review_criteria()
-    return {"teammates": teammates, "criteria": criteria}
+    
+    # Get current review phase
+    current_phase = db.get_review_state()
+    
+    # Get all criteria from peer_review_criteria table (includes default seeded + instructor-added criteria)
+    all_peer_review_criteria = db.get_peer_review_criteria()
+    
+    # Get instructor-defined criteria for descriptions
+    instructor_criteria = db.get_all_criteria()
+    
+    # Create a mapping of instructor criteria by name for descriptions
+    instructor_by_name = {c["name"].strip().lower(): c for c in instructor_criteria}
+    
+    # Default criteria names (these are always shown)
+    default_criteria_names = {"contribution", "communication", "quality of work", "reliability"}
+    
+    # Default criteria descriptions (used if not in instructor_criteria)
+    default_criteria_descriptions = {
+        "contribution": "Evaluate the team member's level of contribution to team projects and activities.",
+        "communication": "Assess how effectively the team member communicates ideas, feedback, and information with the team.",
+        "quality of work": "Rate the quality, accuracy, and thoroughness of the work produced by this team member.",
+        "reliability": "Evaluate how dependable and consistent the team member is in meeting deadlines and commitments.",
+    }
+    
+    # Filter criteria based on phase
+    # Round1: Only 4 default criteria
+    # Round2: 4 default + instructor-added criteria
+    filtered_criteria = []
+    for prc in all_peer_review_criteria:
+        title = prc["title"].strip()
+        title_lower = title.lower()
+        
+        # In round1, only show default criteria
+        if current_phase == "round1":
+            if title_lower not in default_criteria_names:
+                continue
+        # In round2, show default + instructor-added (those in criteria table)
+        elif current_phase == "round2":
+            if title_lower not in default_criteria_names and title_lower not in instructor_by_name:
+                continue
+        
+        # Get description from instructor_criteria if available, otherwise use default
+        description = ""
+        if title_lower in instructor_by_name:
+            description = instructor_by_name[title_lower]["description"]
+        elif title_lower in default_criteria_descriptions:
+            description = default_criteria_descriptions[title_lower]
+        
+        filtered_criteria.append({
+            "id": prc["id"],
+            "title": title,
+            "description": description,
+            "required": prc["required"],
+            "scale": prc["scale"],
+            "weight": prc["weight"],
+        })
+    
+    return {"teammates": teammates, "criteria": filtered_criteria, "phase": current_phase}
 
 
 @peer_review_router.get("/submitted/{teammate_id}")
 def get_submitted_review(teammate_id: int, user=Depends(require_roles("student"))):
-    """Get previously submitted review for a specific teammate (for editing)."""
+    """Get previously submitted review for a specific teammate (for editing).
+    Only returns reviews for the current phase. Round1 submissions are locked once round2 starts.
+    """
     # Verify the teammate is valid
     teammates = db.get_student_teammates_except(user["username"])
     allowed_teammate_ids = {t["id"] for t in teammates}
-    
+
     if teammate_id not in allowed_teammate_ids:
         raise HTTPException(status_code=404, detail="Teammate not found")
-    
+
+    # Get current review phase
+    current_phase = db.get_review_state()
+
     # Get reviewer info
     reviewer = db.get_user_by_username(user["username"])
     if not reviewer:
         raise HTTPException(status_code=404, detail="Reviewer not found")
-    
+
     reviewer_id = reviewer["id"]
-    
-    # Get submitted reviews
-    reviews = db.get_reviews_submitted_by_reviewer_for_reviewee(reviewer_id, teammate_id)
-    
+
+    # Get submitted reviews for the current phase only
+    reviews = db.get_reviews_submitted_by_reviewer_for_reviewee(reviewer_id, teammate_id, round=current_phase)
+
     if not reviews:
-        return {"teammate_id": teammate_id, "answers": [], "submitted": False}
-    
+        return {"teammate_id": teammate_id, "answers": [], "submitted": False, "phase": current_phase}
+
     # Format as answers
     answers = [
         {"criterion_id": r["criterion_id"], "rating": r["rating"]}
         for r in reviews
     ]
-    
+
     return {
         "teammate_id": teammate_id,
         "answers": answers,
         "submitted": True,
-        "submitted_at": reviews[0]["submitted_at"] if reviews else None
+        "submitted_at": reviews[0]["submitted_at"] if reviews else None,
+        "phase": current_phase
     }
 
 
@@ -416,10 +492,39 @@ def validate_peer_review_submission(
 
 @peer_review_router.post("/submit")
 def submit_peer_review(body: SubmitPeerReviewBody, user=Depends(require_roles("student"))):
+    # Check if submissions are open (deadline not passed)
+    if not db.is_submission_open():
+        raise HTTPException(status_code=403, detail="Submissions are closed.")
+    
     teammates = db.get_student_teammates_except(user["username"])
     allowed_teammate_ids = {t["id"] for t in teammates}
 
-    criteria = db.get_peer_review_criteria()
+    # Get current review phase
+    current_phase = db.get_review_state()
+    
+    # Check if phase is valid for submissions
+    if current_phase == "published":
+        raise HTTPException(status_code=403, detail="Reviews are published and cannot be submitted or edited")
+
+    # Get criteria from peer_review_criteria for validation and submission
+    # Filter by phase (form endpoint already does this, but we need full list for validation)
+    all_criteria = db.get_peer_review_criteria()
+    
+    # Filter criteria based on phase (same logic as form endpoint)
+    default_criteria_names = {"contribution", "communication", "quality of work", "reliability"}
+    instructor_criteria = db.get_all_criteria()
+    instructor_by_name = {c["name"].strip().lower(): c for c in instructor_criteria}
+    
+    criteria = []
+    for prc in all_criteria:
+        title_lower = prc["title"].strip().lower()
+        if current_phase == "round1":
+            if title_lower not in default_criteria_names:
+                continue
+        elif current_phase == "round2":
+            if title_lower not in default_criteria_names and title_lower not in instructor_by_name:
+                continue
+        criteria.append(prc)
 
     # Validate the submission
     errors = validate_peer_review_submission(body.reviews, allowed_teammate_ids, criteria)
@@ -434,7 +539,7 @@ def submit_peer_review(body: SubmitPeerReviewBody, user=Depends(require_roles("s
 
     reviewer_id = reviewer["id"]
 
-    # Save all reviews
+    # Save all reviews with the current round
     for review in body.reviews:
         for answer in review.answers:
             db.save_peer_review_submission(
@@ -442,6 +547,7 @@ def submit_peer_review(body: SubmitPeerReviewBody, user=Depends(require_roles("s
                 reviewee_id=review.teammate_id,
                 criterion_id=answer.criterion_id,
                 rating=answer.rating,
+                round=current_phase,
             )
 
     return {"ok": True}
@@ -748,5 +854,234 @@ def get_my_submitted_reviews(user=Depends(require_roles("student"))):
     }
 
 
+# -------------------------
+# Criteria Management Router
+# -------------------------
+criteria_router = APIRouter(prefix="/criteria", tags=["criteria"])
+
+
+class CriterionCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    description: str = Field(min_length=1, max_length=1000)
+
+    @field_validator("name", "description")
+    @classmethod
+    def validate_non_empty(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Field cannot be empty")
+        return v
+
+
+class CriterionUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    description: str = Field(min_length=1, max_length=1000)
+
+    @field_validator("name", "description")
+    @classmethod
+    def validate_non_empty(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Field cannot be empty")
+        return v
+
+
+@criteria_router.post("", status_code=201)
+def create_criterion(body: CriterionCreate, user=Depends(require_roles("instructor"))):
+    """Create a new evaluation criterion (instructor-only, allowed in round2)."""
+    # Check review state - criteria can only be added in round2
+    current_state = db.get_review_state()
+    if current_state != "round2":
+        raise HTTPException(
+            status_code=403,
+            detail=f"Cannot create criteria when review state is '{current_state}'. Criteria can only be created in round2."
+        )
+    
+    try:
+        # Create criterion in criteria table
+        criterion_id = db.create_criterion(body.name, body.description)
+        
+        # Also sync to peer_review_criteria table for submissions (default: required=True, scale 1-5, weight=1.0)
+        db.insert_peer_review_criteria(
+            title=body.name,
+            required=1,  # All criteria are required by default
+            scale_min=1,
+            scale_max=5,
+            weight=1.0
+        )
+        
+        criterion = db.get_criterion_by_id(criterion_id)
+        return criterion
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=409, detail="Criterion with this name already exists")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create criterion: {str(e)}")
+
+
+@criteria_router.get("")
+def get_criteria(user=Depends(require_roles("instructor"))):
+    """Get all evaluation criteria (instructor-only)."""
+    criteria = db.get_all_criteria()
+    return {"criteria": criteria}
+
+
+@criteria_router.put("/{criterion_id}")
+def update_criterion(
+    criterion_id: int,
+    body: CriterionUpdate,
+    user=Depends(require_roles("instructor")),
+):
+    """Update an evaluation criterion (instructor-only, allowed in round2)."""
+    # Check review state - criteria can only be edited in round2
+    current_state = db.get_review_state()
+    if current_state != "round2":
+        raise HTTPException(
+            status_code=403,
+            detail=f"Cannot edit criteria when review state is '{current_state}'. Criteria can only be edited in round2."
+        )
+    
+    # Check if criterion exists
+    existing = db.get_criterion_by_id(criterion_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Criterion not found")
+    
+    # Update the criterion
+    success = db.update_criterion(criterion_id, body.name, body.description)
+    if not success:
+        raise HTTPException(status_code=404, detail="Criterion not found")
+    
+    updated = db.get_criterion_by_id(criterion_id)
+    return updated
+
+
+@criteria_router.delete("/{criterion_id}")
+def delete_criterion(criterion_id: int, user=Depends(require_roles("instructor"))):
+    """Delete an evaluation criterion (instructor-only, allowed in round1 and round2, not published)."""
+    # Check review state - criteria cannot be deleted when published
+    current_state = db.get_review_state()
+    if current_state == "published":
+        raise HTTPException(
+            status_code=403,
+            detail=f"Cannot delete criteria when review state is 'published'. Reviews are read-only after publishing."
+        )
+    
+    # Check if criterion exists
+    existing = db.get_criterion_by_id(criterion_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Criterion not found")
+    
+    # Delete the criterion
+    success = db.delete_criterion(criterion_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Criterion not found")
+    
+    return {"ok": True, "message": "Criterion deleted successfully"}
+
+
+# -------------------------
+# Review State Router
+# -------------------------
+review_state_router = APIRouter(prefix="/review", tags=["review-state"])
+
+
+class ReviewStateUpdate(BaseModel):
+    status: str = Field(..., description="Review state: 'round1', 'round2', or 'published'")
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: str) -> str:
+        if v not in ("round1", "round2", "published"):
+            raise ValueError("Status must be 'round1', 'round2', or 'published'")
+        return v
+
+
+@review_state_router.get("/state")
+def get_review_state_endpoint(user=Depends(require_roles("instructor"))):
+    """Get the current review state (instructor-only)."""
+    status = db.get_review_state()
+    return {"status": status}
+
+
+@review_state_router.post("/state")
+def set_review_state_endpoint(
+    body: ReviewStateUpdate, user=Depends(require_roles("instructor"))
+):
+    """Set the review state (instructor-only)."""
+    try:
+        db.set_review_state(body.status)
+        return {"ok": True, "status": body.status}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to set review state: {str(e)}")
+
+
+@review_state_router.put("/state")
+def update_review_state_endpoint(
+    body: ReviewStateUpdate, user=Depends(require_roles("instructor"))
+):
+    """Update the review state (instructor-only). Alias for POST /review/state."""
+    return set_review_state_endpoint(body, user)
+
+
+@review_state_router.post("/start-round2")
+def start_round2(user=Depends(require_roles("instructor"))):
+    """Start Round 2 of evaluations (instructor-only). Transitions from round1 (or draft) to round2."""
+    current_state = db.get_review_state()
+    
+    # Allow starting Round 2 from "round1" or "draft" (for backward compatibility)
+    if current_state not in ("round1", "draft"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot start Round 2. Current state is '{current_state}'. Round 2 can only be started from Round 1."
+        )
+    
+    try:
+        db.set_review_state("round2")
+        return {"ok": True, "status": "round2", "message": "Round 2 started successfully"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to start Round 2: {str(e)}")
+
+
 app.include_router(peer_review_router)
 app.include_router(auth_router)
+app.include_router(criteria_router)
+app.include_router(review_state_router)
+
+
+# -------------------------
+# Submission Deadline Router
+# -------------------------
+deadline_router = APIRouter(prefix="/deadline", tags=["deadline"])
+
+
+class DeadlineUpdate(BaseModel):
+    deadline: Optional[str] = Field(None, description="ISO datetime string or null to clear")
+
+
+@deadline_router.get("")
+def get_deadline(user=Depends(get_current_user)):
+    """Get the current submission deadline and status."""
+    deadline = db.get_submission_deadline()
+    is_open = db.is_submission_open()
+    return {"deadline": deadline, "is_open": is_open}
+
+
+@deadline_router.post("")
+def set_deadline(body: DeadlineUpdate, user=Depends(require_roles("instructor"))):
+    """Set or clear the submission deadline (instructor-only)."""
+    db.set_submission_deadline(body.deadline)
+    is_open = db.is_submission_open()
+    return {"ok": True, "deadline": body.deadline, "is_open": is_open}
+
+
+@deadline_router.delete("")
+def clear_deadline(user=Depends(require_roles("instructor"))):
+    """Clear the submission deadline (instructor-only)."""
+    db.set_submission_deadline(None)
+    return {"ok": True, "deadline": None, "is_open": True}
+
+
+app.include_router(deadline_router)

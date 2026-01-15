@@ -76,7 +76,7 @@ def init_db() -> None:
             """
         )
 
-        # ✅ Peer review submissions (stores individual reviews)
+        # ✅ Peer review submissions (stores individual reviews with round tracking)
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS peer_review_submissions (
@@ -85,19 +85,19 @@ def init_db() -> None:
                 reviewee_id INTEGER NOT NULL,
                 criterion_id INTEGER NOT NULL,
                 rating INTEGER NOT NULL,
+                round TEXT NOT NULL DEFAULT 'round1',
                 submitted_at TEXT NOT NULL DEFAULT (datetime('now')),
                 FOREIGN KEY (reviewer_id) REFERENCES users(id),
                 FOREIGN KEY (reviewee_id) REFERENCES users(id),
-                FOREIGN KEY (criterion_id) REFERENCES peer_review_criteria(id),
-                UNIQUE(reviewer_id, reviewee_id, criterion_id)
+                FOREIGN KEY (criterion_id) REFERENCES peer_review_criteria(id)
             );
             """
         )
-        # Create unique index for conflict resolution
+        # Create unique index for conflict resolution (includes round)
         conn.execute(
             """
             CREATE UNIQUE INDEX IF NOT EXISTS idx_peer_review_unique 
-            ON peer_review_submissions(reviewer_id, reviewee_id, criterion_id);
+            ON peer_review_submissions(reviewer_id, reviewee_id, criterion_id, round);
             """
         )
 
@@ -116,6 +116,69 @@ def init_db() -> None:
         # Migration: Add weight column to criteria if it doesn't exist
         if not _column_exists(conn, "peer_review_criteria", "weight"):
             conn.execute("ALTER TABLE peer_review_criteria ADD COLUMN weight REAL NOT NULL DEFAULT 1.0;")
+
+        # ✅ Evaluation criteria table (for instructor-defined criteria)
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS criteria (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            """
+        )
+
+        # ✅ Review state table (tracks review lifecycle: round1, round2, published)
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS review_state (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                status TEXT NOT NULL DEFAULT 'round1' CHECK (status IN ('round1', 'round2', 'published'))
+            );
+            """
+        )
+
+        # Migration: Update review_state table structure if needed
+        # Drop and recreate to update CHECK constraint (SQLite doesn't support ALTER TABLE CHECK)
+        try:
+            existing_state = conn.execute("SELECT COUNT(*) AS c FROM review_state").fetchone()
+            if existing_state and int(existing_state["c"]) > 0:
+                # Migrate existing states: draft -> round1, started -> round1, published -> published
+                current_status = conn.execute("SELECT status FROM review_state WHERE id = 1").fetchone()
+                if current_status:
+                    old_status = current_status["status"]
+                    new_status = "round1" if old_status in ("draft", "started") else "published"
+                    conn.execute("UPDATE review_state SET status = ? WHERE id = 1", (new_status,))
+        except Exception:
+            pass
+        
+        # Initialize review_state if it doesn't exist
+        existing_state = conn.execute("SELECT COUNT(*) AS c FROM review_state").fetchone()
+        if existing_state and int(existing_state["c"]) == 0:
+            conn.execute("INSERT INTO review_state (id, status) VALUES (1, 'round1')")
+
+        # Migration: Add round column to peer_review_submissions if it doesn't exist
+        if not _column_exists(conn, "peer_review_submissions", "round"):
+            conn.execute("ALTER TABLE peer_review_submissions ADD COLUMN round TEXT NOT NULL DEFAULT 'round1'")
+            # Update unique constraint to include round
+            conn.execute("DROP INDEX IF EXISTS idx_peer_review_unique")
+            conn.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_peer_review_unique 
+                ON peer_review_submissions(reviewer_id, reviewee_id, criterion_id, round);
+                """
+            )
+
+        # ✅ Submission deadline table
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS submission_deadline (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                deadline TEXT
+            );
+            """
+        )
 
 
 def create_user(email: str, username: str, password_hash: str, role: str) -> None:
@@ -233,16 +296,16 @@ def insert_peer_review_criteria(title: str, required: int, scale_min: int, scale
 # =========================
 # Peer Review Submissions
 # =========================
-def save_peer_review_submission(reviewer_id: int, reviewee_id: int, criterion_id: int, rating: int) -> None:
-    """Save or update a peer review submission."""
+def save_peer_review_submission(reviewer_id: int, reviewee_id: int, criterion_id: int, rating: int, round: str = "round1") -> None:
+    """Save or update a peer review submission for a specific round."""
     with get_conn() as conn:
-        # Check if review already exists
+        # Check if review already exists for this round
         existing = conn.execute(
             """
             SELECT id FROM peer_review_submissions
-            WHERE reviewer_id = ? AND reviewee_id = ? AND criterion_id = ?
+            WHERE reviewer_id = ? AND reviewee_id = ? AND criterion_id = ? AND round = ?
             """,
-            (reviewer_id, reviewee_id, criterion_id),
+            (reviewer_id, reviewee_id, criterion_id, round),
         ).fetchone()
         
         if existing:
@@ -251,18 +314,18 @@ def save_peer_review_submission(reviewer_id: int, reviewee_id: int, criterion_id
                 """
                 UPDATE peer_review_submissions
                 SET rating = ?, submitted_at = datetime('now')
-                WHERE reviewer_id = ? AND reviewee_id = ? AND criterion_id = ?
+                WHERE reviewer_id = ? AND reviewee_id = ? AND criterion_id = ? AND round = ?
                 """,
-                (rating, reviewer_id, reviewee_id, criterion_id),
+                (rating, reviewer_id, reviewee_id, criterion_id, round),
             )
         else:
             # Insert new review
             conn.execute(
                 """
-                INSERT INTO peer_review_submissions (reviewer_id, reviewee_id, criterion_id, rating)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO peer_review_submissions (reviewer_id, reviewee_id, criterion_id, rating, round)
+                VALUES (?, ?, ?, ?, ?)
                 """,
-                (reviewer_id, reviewee_id, criterion_id, rating),
+                (reviewer_id, reviewee_id, criterion_id, rating, round),
             )
 
 
@@ -293,21 +356,43 @@ def get_peer_reviews_for_student(student_id: int) -> list[dict]:
         return [dict(row) for row in rows]
 
 
-def get_reviews_submitted_by_reviewer_for_reviewee(reviewer_id: int, reviewee_id: int) -> list[dict]:
-    """Get all reviews submitted by a reviewer for a specific reviewee (for editing)."""
+def get_reviews_submitted_by_reviewer_for_reviewee(reviewer_id: int, reviewee_id: int, round: Optional[str] = None) -> list[dict]:
+    """Get all reviews submitted by a reviewer for a specific reviewee (for editing).
+    
+    Args:
+        reviewer_id: ID of the reviewer
+        reviewee_id: ID of the reviewee
+        round: Optional round filter ('round1', 'round2'). If None, returns all rounds.
+    """
     with get_conn() as conn:
-        rows = conn.execute(
-            """
-            SELECT 
-                prs.criterion_id,
-                prs.rating,
-                prs.submitted_at
-            FROM peer_review_submissions prs
-            WHERE prs.reviewer_id = ? AND prs.reviewee_id = ?
-            ORDER BY prs.criterion_id
-            """,
-            (reviewer_id, reviewee_id),
-        ).fetchall()
+        if round:
+            rows = conn.execute(
+                """
+                SELECT
+                    prs.criterion_id,
+                    prs.rating,
+                    prs.submitted_at,
+                    prs.round
+                FROM peer_review_submissions prs
+                WHERE prs.reviewer_id = ? AND prs.reviewee_id = ? AND prs.round = ?
+                ORDER BY prs.criterion_id
+                """,
+                (reviewer_id, reviewee_id, round),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT
+                    prs.criterion_id,
+                    prs.rating,
+                    prs.submitted_at,
+                    prs.round
+                FROM peer_review_submissions prs
+                WHERE prs.reviewer_id = ? AND prs.reviewee_id = ?
+                ORDER BY prs.round, prs.criterion_id
+                """,
+                (reviewer_id, reviewee_id),
+            ).fetchall()
         return [dict(row) for row in rows]
 
 
@@ -516,3 +601,111 @@ def get_reviews_submitted_by_reviewer(reviewer_id: int) -> list[dict]:
         result.sort(key=lambda x: x["submitted_at"], reverse=True)
         
         return result
+
+
+# =========================
+# Evaluation Criteria Management
+# =========================
+def create_criterion(name: str, description: str) -> int:
+    """Create a new evaluation criterion. Returns the ID of the created criterion."""
+    with get_conn() as conn:
+        cursor = conn.execute(
+            "INSERT INTO criteria (name, description) VALUES (?, ?)",
+            (name.strip(), description.strip()),
+        )
+        return cursor.lastrowid
+
+
+def get_all_criteria() -> list[dict]:
+    """Get all evaluation criteria."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, name, description, created_at FROM criteria ORDER BY id"
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def get_criterion_by_id(criterion_id: int) -> Optional[Dict[str, Any]]:
+    """Get a criterion by ID."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT id, name, description, created_at FROM criteria WHERE id = ?",
+            (criterion_id,),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def update_criterion(criterion_id: int, name: str, description: str) -> bool:
+    """Update a criterion. Returns True if updated, False if not found."""
+    with get_conn() as conn:
+        cursor = conn.execute(
+            "UPDATE criteria SET name = ?, description = ? WHERE id = ?",
+            (name.strip(), description.strip(), criterion_id),
+        )
+        return cursor.rowcount > 0
+
+
+def delete_criterion(criterion_id: int) -> bool:
+    """Delete a criterion. Returns True if deleted, False if not found."""
+    with get_conn() as conn:
+        cursor = conn.execute("DELETE FROM criteria WHERE id = ?", (criterion_id,))
+        return cursor.rowcount > 0
+
+
+# =========================
+# Review State Management
+# =========================
+def get_review_state() -> str:
+    """Get the current review state status. Returns 'round1' by default if not set."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT status FROM review_state WHERE id = 1").fetchone()
+        return row["status"] if row else "round1"
+
+
+def set_review_state(status: str) -> None:
+    """Set the review state status. Must be 'round1', 'round2', or 'published'."""
+    if status not in ("round1", "round2", "published"):
+        raise ValueError(f"Invalid status: {status}. Must be 'round1', 'round2', or 'published'")
+    
+    with get_conn() as conn:
+        # Use INSERT OR REPLACE to ensure id=1 always exists
+        conn.execute(
+            "INSERT OR REPLACE INTO review_state (id, status) VALUES (1, ?)",
+            (status,),
+        )
+
+
+# =========================
+# Submission Deadline Management
+# =========================
+def get_submission_deadline() -> Optional[str]:
+    """Get the current submission deadline. Returns ISO datetime string or None if not set."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT deadline FROM submission_deadline WHERE id = 1").fetchone()
+        return row["deadline"] if row else None
+
+
+def set_submission_deadline(deadline: Optional[str]) -> None:
+    """Set or clear the submission deadline. Pass None to clear."""
+    with get_conn() as conn:
+        if deadline is None:
+            conn.execute("DELETE FROM submission_deadline WHERE id = 1")
+        else:
+            conn.execute(
+                "INSERT OR REPLACE INTO submission_deadline (id, deadline) VALUES (1, ?)",
+                (deadline,),
+            )
+
+
+def is_submission_open() -> bool:
+    """Check if submissions are currently open (deadline not passed or not set)."""
+    from datetime import datetime
+    deadline = get_submission_deadline()
+    if deadline is None:
+        return True  # No deadline = always open
+    try:
+        deadline_dt = datetime.fromisoformat(deadline.replace('Z', '+00:00'))
+        now = datetime.now(deadline_dt.tzinfo) if deadline_dt.tzinfo else datetime.now()
+        return now < deadline_dt
+    except Exception:
+        return True  # If parsing fails, allow submissions

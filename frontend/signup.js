@@ -31,6 +31,11 @@ function extractDetail(data) {
   return data.detail || data.message || null;
 }
 
+// ✅ Single dashboard redirect
+function redirectToDashboard() {
+  window.location.replace("dashboard.html");
+}
+
 if (form) {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -57,7 +62,9 @@ if (form) {
     try {
       console.log("Attempting signup for:", username);
       console.log("Backend URL:", BACKEND_URL);
-      const res = await fetch(`${BACKEND_URL}/auth/signup`, {
+
+      const signupUrl = `${BACKEND_URL}/auth/signup`;
+      const res = await fetch(signupUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -73,32 +80,31 @@ if (form) {
 
       const ct = res.headers.get("content-type") || "";
       let data = null;
-      
+
       try {
         const responseText = await res.text();
         console.log("Response status:", res.status);
-        console.log("Response headers:", Object.fromEntries(res.headers.entries()));
+        console.log("Request URL was:", signupUrl);
         console.log("Response body (first 500 chars):", responseText.substring(0, 500));
-        console.log("Request URL was:", `${BACKEND_URL}/auth/signup`);
-        
+
         // Handle 404 Not Found immediately
         if (res.status === 404) {
-          let errorMsg = `The endpoint ${BACKEND_URL}/auth/signup was not found. `;
+          let errorMsg = `The endpoint ${signupUrl} was not found. `;
           errorMsg += "Please ensure the backend server is running. ";
-          errorMsg += "From the backend folder, run: python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000";
+          errorMsg +=
+            "From the backend folder, run: python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000";
           setMessage(errorMsg, "error");
           setLoading(false);
           return;
         }
-        
+
         if (ct.includes("application/json") || responseText.trim().startsWith("{")) {
           try {
             data = JSON.parse(responseText);
           } catch (jsonErr) {
             console.error("JSON parse error:", jsonErr);
-            // If it looks like JSON but failed to parse, check if it's a "Not Found" message
             if (responseText.includes("Not Found") || responseText.includes('"detail":"Not Found"')) {
-              setMessage(`The endpoint ${BACKEND_URL}/auth/signup was not found. Please ensure the backend is running.`, "error");
+              setMessage(`The endpoint ${signupUrl} was not found. Please ensure the backend is running.`, "error");
             } else {
               setMessage("Failed to parse server response. Please check backend.", "error");
             }
@@ -107,10 +113,9 @@ if (form) {
           }
         } else {
           console.error("Non-JSON response received. Full response:", responseText);
-          // Show more helpful error message
           let errorMsg = "Server returned non-JSON response. ";
           if (responseText.includes("404") || responseText.includes("Not Found")) {
-            errorMsg += `The endpoint ${BACKEND_URL}/auth/signup was not found. Is the backend running?`;
+            errorMsg += `The endpoint ${signupUrl} was not found. Is the backend running?`;
           } else if (responseText.includes("<!DOCTYPE") || responseText.includes("<html")) {
             errorMsg += "Received HTML instead of JSON. The backend might not be running or the URL is incorrect.";
           } else {
@@ -127,28 +132,32 @@ if (form) {
         return;
       }
 
+      // ✅ SIGNUP SUCCESS
       if (res.status === 201 || res.ok) {
         // Automatically log in the user after successful signup
         try {
           // Small delay to ensure user is fully created in database
-          await new Promise(resolve => setTimeout(resolve, 200));
-          
+          await new Promise((resolve) => setTimeout(resolve, 200));
+
           console.log("Attempting auto-login for:", username);
-          const loginRes = await fetch(`${BACKEND_URL}/auth/login`, {
+
+          const loginUrl = `${BACKEND_URL}/auth/login`;
+
+          // Login endpoint expects JSON (same as regular login form)
+          const loginRes = await fetch(loginUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ username, password }),
           });
 
-          // Parse login response properly
           const loginCt = loginRes.headers.get("content-type") || "";
           let loginData = null;
-          
+
           try {
             const loginResponseText = await loginRes.text();
             console.log("Login response status:", loginRes.status);
-            console.log("Login response text:", loginResponseText);
-            
+            console.log("Login response text (first 500 chars):", loginResponseText.substring(0, 500));
+
             if (loginCt.includes("application/json") || loginResponseText.trim().startsWith("{")) {
               loginData = JSON.parse(loginResponseText);
             } else {
@@ -165,37 +174,32 @@ if (form) {
             localStorage.setItem("isLoggedIn", "true");
             localStorage.setItem("username", username);
 
-            // Show confirmation message and redirect to dashboard
-            setMessage("✓ Account created successfully! Redirecting...", "success");
-            setLoading(false);
-            
-            // Small delay to ensure localStorage is set before redirect
-            setTimeout(() => {
-              window.location.href = "dashboard.html";
-            }, 100);
+            // ✅ Redirect immediately into the app
+            redirectToDashboard();
             return;
           }
-          
-          // If auto-login fails, show error but still allow manual login
+
+          // If auto-login fails, still guide user
           console.error("Auto-login failed. Status:", loginRes.status, "Data:", loginData);
           setMessage("✓ Account created successfully! Please log in to continue.", "success");
           setLoading(false);
-          // Redirect to login page after a short delay
+
           setTimeout(() => {
             window.location.href = "login.html";
-          }, 2000);
+          }, 1200);
         } catch (loginErr) {
           console.error("Auto-login error:", loginErr);
-          // If auto-login fails, show message and redirect to login
           setMessage("✓ Account created successfully! Please log in to continue.", "success");
           setLoading(false);
+
           setTimeout(() => {
             window.location.href = "login.html";
-          }, 2000);
+          }, 1200);
         }
         return;
       }
 
+      // Other errors
       if (res.status === 409) {
         const detail = extractDetail(data) || "Username or email already exists.";
         setMessage(detail, "error");
@@ -210,9 +214,17 @@ if (form) {
       console.error("Signup error:", err);
       console.error("Error name:", err.name);
       console.error("Error message:", err.message);
-      
-      if (err.message && (err.message.includes("Failed to fetch") || err.message.includes("NetworkError") || err.message.includes("Load failed"))) {
-        setMessage("Cannot connect to backend server. Please ensure the backend is running. From the backend folder, run: python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000", "error");
+
+      if (
+        err.message &&
+        (err.message.includes("Failed to fetch") ||
+          err.message.includes("NetworkError") ||
+          err.message.includes("Load failed"))
+      ) {
+        setMessage(
+          "Cannot connect to backend server. Please ensure the backend is running. From the backend folder, run: python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000",
+          "error"
+        );
       } else {
         setMessage("Connection error: " + (err.message || err.toString()), "error");
       }

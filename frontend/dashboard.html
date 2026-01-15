@@ -14,7 +14,7 @@
   <!-- Page protection -->
   <script src="protected.js"></script>
 </head>
-<body class="dashboard-body">
+<body class="dashboard-body signup-page">
   <!-- Top Navigation Bar -->
   <nav class="dashboard-nav">
     <div class="nav-brand">
@@ -101,6 +101,122 @@
               Monitor student submissions and publish results when ready.
             </p>
             
+            <!-- Submission Deadline -->
+            <div id="deadlineCard" style="margin-bottom: 28px; background: #ffffff; border-radius: 16px; padding: 0; border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04); overflow: hidden;">
+              <!-- Header -->
+              <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 20px 24px; display: flex; align-items: center; gap: 14px;">
+                <div style="width: 44px; height: 44px; background: rgba(255,255,255,0.15); backdrop-filter: blur(8px); border-radius: 12px; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.1);">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                    <circle cx="12" cy="16" r="2"></circle>
+                  </svg>
+                </div>
+                <div>
+                  <h3 style="font-size: 17px; font-weight: 600; color: #ffffff; margin: 0; letter-spacing: -0.01em;">Submission Deadline</h3>
+                  <p style="font-size: 13px; color: rgba(255,255,255,0.7); margin: 3px 0 0 0;">Control when students can submit reviews</p>
+                </div>
+              </div>
+              
+              <div id="deadlineContent" style="padding: 24px;">
+                <!-- Status Display -->
+                <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-radius: 12px; padding: 18px 20px; margin-bottom: 24px; border: 1px solid #e2e8f0;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                    <div>
+                      <div style="font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px;">Current Status</div>
+                      <div id="currentDeadlineDisplay" style="font-size: 15px; color: #334155; font-weight: 500; line-height: 1.4;"></div>
+                    </div>
+                    <span id="deadlineStatusBadge" style="padding: 8px 18px; border-radius: 24px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;">Loading...</span>
+                  </div>
+                </div>
+                
+                <!-- Date/Time Input -->
+                <div style="margin-bottom: 20px;">
+                  <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 12px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    Set New Deadline
+                  </label>
+                  
+                  <!-- Date Row -->
+                  <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                    <div style="flex: 1;">
+                      <label style="display: block; font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Month</label>
+                      <select id="deadlineMonth" style="width: 100%; padding: 12px 14px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; font-weight: 500; color: #1f2937; background: #ffffff; cursor: pointer; transition: all 0.2s ease; outline: none; appearance: none; background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2214%22 height=%2214%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%236b7280%22 stroke-width=%222%22><polyline points=%226 9 12 15 18 9%22/></svg>'); background-repeat: no-repeat; background-position: right 12px center;">
+                        <option value="">Month</option>
+                        <option value="01">January</option>
+                        <option value="02">February</option>
+                        <option value="03">March</option>
+                        <option value="04">April</option>
+                        <option value="05">May</option>
+                        <option value="06">June</option>
+                        <option value="07">July</option>
+                        <option value="08">August</option>
+                        <option value="09">September</option>
+                        <option value="10">October</option>
+                        <option value="11">November</option>
+                        <option value="12">December</option>
+                      </select>
+                    </div>
+                    <div style="width: 90px;">
+                      <label style="display: block; font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Day</label>
+                      <select id="deadlineDay" style="width: 100%; padding: 12px 14px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; font-weight: 500; color: #1f2937; background: #ffffff; cursor: pointer; transition: all 0.2s ease; outline: none; appearance: none; background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2214%22 height=%2214%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%236b7280%22 stroke-width=%222%22><polyline points=%226 9 12 15 18 9%22/></svg>'); background-repeat: no-repeat; background-position: right 12px center;">
+                        <option value="">Day</option>
+                      </select>
+                    </div>
+                    <div style="width: 100px;">
+                      <label style="display: block; font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Year</label>
+                      <select id="deadlineYear" style="width: 100%; padding: 12px 14px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; font-weight: 500; color: #1f2937; background: #ffffff; cursor: pointer; transition: all 0.2s ease; outline: none; appearance: none; background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2214%22 height=%2214%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%236b7280%22 stroke-width=%222%22><polyline points=%226 9 12 15 18 9%22/></svg>'); background-repeat: no-repeat; background-position: right 12px center;">
+                        <option value="">Year</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <!-- Time Row -->
+                  <div style="display: flex; gap: 10px; align-items: end;">
+                    <div style="width: 100px;">
+                      <label style="display: block; font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Hour</label>
+                      <select id="deadlineHour" style="width: 100%; padding: 12px 14px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; font-weight: 500; color: #1f2937; background: #ffffff; cursor: pointer; transition: all 0.2s ease; outline: none; appearance: none; background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2214%22 height=%2214%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%236b7280%22 stroke-width=%222%22><polyline points=%226 9 12 15 18 9%22/></svg>'); background-repeat: no-repeat; background-position: right 12px center;">
+                        <option value="">Hour</option>
+                      </select>
+                    </div>
+                    <div style="font-size: 20px; font-weight: 600; color: #9ca3af; padding-bottom: 12px;">:</div>
+                    <div style="width: 100px;">
+                      <label style="display: block; font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Minute</label>
+                      <select id="deadlineMinute" style="width: 100%; padding: 12px 14px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; font-weight: 500; color: #1f2937; background: #ffffff; cursor: pointer; transition: all 0.2s ease; outline: none; appearance: none; background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2214%22 height=%2214%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%236b7280%22 stroke-width=%222%22><polyline points=%226 9 12 15 18 9%22/></svg>'); background-repeat: no-repeat; background-position: right 12px center;">
+                        <option value="">Min</option>
+                      </select>
+                    </div>
+                    <div style="flex: 1;"></div>
+                  </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div style="display: grid; grid-template-columns: 1fr auto; gap: 12px;">
+                  <button id="setDeadlineBtn" type="button" style="padding: 14px 28px; background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%); border: none; border-radius: 10px; color: white; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.2s ease; box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(79, 70, 229, 0.35)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(79, 70, 229, 0.25)'">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                    <span>Set Deadline</span>
+                  </button>
+                  <button id="clearDeadlineBtn" type="button" style="padding: 14px 20px; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; color: #6b7280; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s ease;" onmouseover="this.style.borderColor='#10b981'; this.style.color='#059669'; this.style.background='#ecfdf5'" onmouseout="this.style.borderColor='#e5e7eb'; this.style.color='#6b7280'; this.style.background='#ffffff'">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                      <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+                    </svg>
+                    <span>Reopen</span>
+                  </button>
+                </div>
+                
+                <div id="deadlineMessage" class="msg" style="margin-top: 16px; padding: 12px 16px; border-radius: 10px; display: none;"></div>
+              </div>
+            </div>
+
             <!-- Submission Status -->
             <div id="submissionStatusCard" class="submission-status-card" style="margin-bottom: 24px;">
               <div class="submission-status-header">
@@ -451,7 +567,9 @@
         }
         // Show instructor controls
         document.getElementById("instructorControlsCard").style.display = "block";
-        // Load submission status, publish status, student reports and setup publish button
+        // Load deadline, submission status, publish status, student reports and setup buttons
+        loadDeadlineStatus();
+        setupDeadlineButtons();
         loadSubmissionStatus();
         loadPublishStatus();
         setupPublishButton();
@@ -466,6 +584,8 @@
         document.getElementById("studentReportCard").style.display = "block";
         // Load peer review report preview
         loadReportPreview();
+        // Check deadline for student submit button
+        checkDeadlineForStudent();
         
         // Setup refresh button for report
         const refreshReportBtn = document.getElementById("refreshReportBtn");
@@ -743,6 +863,323 @@
       noDataState.style.display = "none";
       errorState.style.display = "block";
       document.getElementById("reportErrorMessage").textContent = message;
+    }
+
+    // Global variable to track submission status
+    window.submissionsOpen = true;
+
+    // Check deadline status for students and disable submit button if closed
+    async function checkDeadlineForStudent() {
+      const token = localStorage.getItem("access_token");
+      if (!token) return;
+
+      try {
+        const res = await fetch(`${window.BACKEND_URL}/deadline`, {
+          method: "GET",
+          headers: { "Authorization": `Bearer ${token}` },
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          window.submissionsOpen = data.is_open;
+          updateStudentSubmitButton(data.is_open, data.deadline);
+        }
+      } catch (err) {
+        console.error("Error checking deadline:", err);
+      }
+    }
+
+    function updateStudentSubmitButton(isOpen, deadline) {
+      const confirmBtn = document.getElementById("confirmDetailsBtn");
+      const submitBtn = document.getElementById("submitReviewBtn");
+      const submitMessage = document.getElementById("submitMessage");
+
+      if (!isOpen) {
+        // Disable buttons and show message
+        if (confirmBtn) {
+          confirmBtn.disabled = true;
+          confirmBtn.style.opacity = "0.5";
+          confirmBtn.style.cursor = "not-allowed";
+        }
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.style.opacity = "0.5";
+          submitBtn.style.cursor = "not-allowed";
+        }
+        if (submitMessage) {
+          const deadlineStr = deadline ? new Date(deadline).toLocaleString() : "";
+          submitMessage.innerHTML = `<span style="color: #ef4444; font-weight: 600;">Submissions are closed.</span>${deadlineStr ? `<br><span style="font-size: 12px; color: #64748b;">Deadline was: ${deadlineStr}</span>` : ""}`;
+          submitMessage.style.display = "block";
+        }
+      } else {
+        // Enable buttons
+        if (confirmBtn) {
+          confirmBtn.disabled = false;
+          confirmBtn.style.opacity = "1";
+          confirmBtn.style.cursor = "pointer";
+        }
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.style.opacity = "1";
+          submitBtn.style.cursor = "pointer";
+        }
+        if (submitMessage && submitMessage.textContent.includes("Submissions are closed")) {
+          submitMessage.innerHTML = "";
+          submitMessage.style.display = "none";
+        }
+      }
+    }
+
+    // Instructor deadline management functions
+    async function loadDeadlineStatus() {
+      const token = localStorage.getItem("access_token");
+      if (!token) return;
+
+      try {
+        const res = await fetch(`${window.BACKEND_URL}/deadline`, {
+          method: "GET",
+          headers: { "Authorization": `Bearer ${token}` },
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          updateDeadlineUI(data.deadline, data.is_open);
+        }
+      } catch (err) {
+        console.error("Error loading deadline:", err);
+      }
+    }
+
+    // Initialize deadline dropdowns
+    function initDeadlineDropdowns() {
+      const daySelect = document.getElementById("deadlineDay");
+      const yearSelect = document.getElementById("deadlineYear");
+      const hourSelect = document.getElementById("deadlineHour");
+      const minuteSelect = document.getElementById("deadlineMinute");
+      const monthSelect = document.getElementById("deadlineMonth");
+
+      // Populate days (1-31)
+      if (daySelect) {
+        daySelect.innerHTML = '<option value="">Day</option>';
+        for (let i = 1; i <= 31; i++) {
+          const val = i.toString().padStart(2, '0');
+          daySelect.innerHTML += `<option value="${val}">${val}</option>`;
+        }
+      }
+
+      // Populate years (current year to +10 years)
+      if (yearSelect) {
+        yearSelect.innerHTML = '<option value="">Year</option>';
+        const currentYear = new Date().getFullYear();
+        for (let i = currentYear; i <= currentYear + 10; i++) {
+          yearSelect.innerHTML += `<option value="${i}">${i}</option>`;
+        }
+      }
+
+      // Populate hours (00-23)
+      if (hourSelect) {
+        hourSelect.innerHTML = '<option value="">Hour</option>';
+        for (let i = 0; i <= 23; i++) {
+          const val = i.toString().padStart(2, '0');
+          hourSelect.innerHTML += `<option value="${val}">${val}</option>`;
+        }
+      }
+
+      // Populate minutes (00, 15, 30, 45 or all)
+      if (minuteSelect) {
+        minuteSelect.innerHTML = '<option value="">Min</option>';
+        for (let i = 0; i <= 59; i += 5) {
+          const val = i.toString().padStart(2, '0');
+          minuteSelect.innerHTML += `<option value="${val}">${val}</option>`;
+        }
+      }
+
+      // Update days when month/year changes
+      if (monthSelect && yearSelect && daySelect) {
+        const updateDays = () => {
+          const month = parseInt(monthSelect.value) || 1;
+          const year = parseInt(yearSelect.value) || new Date().getFullYear();
+          const daysInMonth = new Date(year, month, 0).getDate();
+          const currentDay = daySelect.value;
+          
+          daySelect.innerHTML = '<option value="">Day</option>';
+          for (let i = 1; i <= daysInMonth; i++) {
+            const val = i.toString().padStart(2, '0');
+            daySelect.innerHTML += `<option value="${val}">${val}</option>`;
+          }
+          
+          if (currentDay && parseInt(currentDay) <= daysInMonth) {
+            daySelect.value = currentDay;
+          }
+        };
+        
+        monthSelect.addEventListener('change', updateDays);
+        yearSelect.addEventListener('change', updateDays);
+      }
+    }
+
+    function updateDeadlineUI(deadline, isOpen) {
+      const badge = document.getElementById("deadlineStatusBadge");
+      const display = document.getElementById("currentDeadlineDisplay");
+
+      if (badge) {
+        if (isOpen) {
+          badge.textContent = "OPEN";
+          badge.style.background = "linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)";
+          badge.style.color = "#15803d";
+          badge.style.boxShadow = "0 2px 8px rgba(22, 163, 74, 0.2)";
+        } else {
+          badge.textContent = "CLOSED";
+          badge.style.background = "linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)";
+          badge.style.color = "#dc2626";
+          badge.style.boxShadow = "0 2px 8px rgba(220, 38, 38, 0.2)";
+        }
+      }
+
+      if (display) {
+        if (deadline) {
+          const dt = new Date(deadline);
+          const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+          display.textContent = dt.toLocaleDateString('en-US', options);
+        } else {
+          display.textContent = "No deadline set — submissions always open";
+        }
+      }
+
+      // Populate dropdowns with current deadline
+      if (deadline) {
+        const dt = new Date(deadline);
+        const monthSelect = document.getElementById("deadlineMonth");
+        const daySelect = document.getElementById("deadlineDay");
+        const yearSelect = document.getElementById("deadlineYear");
+        const hourSelect = document.getElementById("deadlineHour");
+        const minuteSelect = document.getElementById("deadlineMinute");
+        
+        if (monthSelect) monthSelect.value = (dt.getMonth() + 1).toString().padStart(2, '0');
+        if (daySelect) daySelect.value = dt.getDate().toString().padStart(2, '0');
+        if (yearSelect) yearSelect.value = dt.getFullYear().toString();
+        if (hourSelect) hourSelect.value = dt.getHours().toString().padStart(2, '0');
+        if (minuteSelect) {
+          // Find closest minute option
+          const mins = dt.getMinutes();
+          const closest = Math.round(mins / 5) * 5;
+          minuteSelect.value = (closest % 60).toString().padStart(2, '0');
+        }
+      }
+    }
+
+    function setupDeadlineButtons() {
+      const setBtn = document.getElementById("setDeadlineBtn");
+      const clearBtn = document.getElementById("clearDeadlineBtn");
+      const msgEl = document.getElementById("deadlineMessage");
+
+      // Initialize dropdowns
+      initDeadlineDropdowns();
+
+      if (setBtn) {
+        setBtn.addEventListener("click", async () => {
+          const token = localStorage.getItem("access_token");
+          if (!token) return;
+
+          const month = document.getElementById("deadlineMonth")?.value;
+          const day = document.getElementById("deadlineDay")?.value;
+          const year = document.getElementById("deadlineYear")?.value;
+          const hour = document.getElementById("deadlineHour")?.value;
+          const minute = document.getElementById("deadlineMinute")?.value;
+
+          if (!month || !day || !year || !hour || !minute) {
+            if (msgEl) {
+              msgEl.textContent = "Please select all date and time fields.";
+              msgEl.className = "msg error";
+              msgEl.style.display = "block";
+            }
+            return;
+          }
+
+          // Build and validate the date
+          const dateStr = `${year}-${month}-${day}T${hour}:${minute}`;
+          const parsedDate = new Date(dateStr);
+          
+          if (isNaN(parsedDate.getTime())) {
+            if (msgEl) {
+              msgEl.textContent = "Invalid date. Please check your selection.";
+              msgEl.className = "msg error";
+              msgEl.style.display = "block";
+            }
+            return;
+          }
+
+          // Convert to ISO string
+          const deadline = parsedDate.toISOString();
+
+          try {
+            const res = await fetch(`${window.BACKEND_URL}/deadline`, {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ deadline }),
+            });
+
+            if (res.ok) {
+              const data = await res.json();
+              updateDeadlineUI(data.deadline, data.is_open);
+              if (msgEl) {
+                msgEl.textContent = "Deadline set successfully!";
+                msgEl.className = "msg success";
+                msgEl.style.display = "block";
+                setTimeout(() => { msgEl.style.display = "none"; }, 3000);
+              }
+            } else {
+              const err = await res.json().catch(() => ({}));
+              if (msgEl) {
+                msgEl.textContent = err.detail || "Failed to set deadline.";
+                msgEl.className = "msg error";
+                msgEl.style.display = "block";
+              }
+            }
+          } catch (err) {
+            console.error("Error setting deadline:", err);
+            if (msgEl) {
+              msgEl.textContent = "Network error.";
+              msgEl.className = "msg error";
+              msgEl.style.display = "block";
+            }
+          }
+        });
+      }
+
+      if (clearBtn) {
+        clearBtn.addEventListener("click", async () => {
+          const token = localStorage.getItem("access_token");
+          if (!token) return;
+
+          try {
+            const res = await fetch(`${window.BACKEND_URL}/deadline`, {
+              method: "DELETE",
+              headers: { "Authorization": `Bearer ${token}` },
+            });
+
+            if (res.ok) {
+              updateDeadlineUI(null, true);
+              // Clear all dropdowns
+              ['deadlineMonth', 'deadlineDay', 'deadlineYear', 'deadlineHour', 'deadlineMinute'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.selectedIndex = 0;
+              });
+              if (msgEl) {
+                msgEl.textContent = "Deadline cleared. Submissions reopened!";
+                msgEl.className = "msg success";
+                msgEl.style.display = "block";
+                setTimeout(() => { msgEl.style.display = "none"; }, 3000);
+              }
+            }
+          } catch (err) {
+            console.error("Error clearing deadline:", err);
+          }
+        });
+      }
     }
 
     // Instructor functions for viewing submissions and publishing results
