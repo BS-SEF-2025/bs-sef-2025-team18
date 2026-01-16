@@ -64,6 +64,14 @@ def signup_js():
 def index_page():
     return FileResponse(FRONTEND_DIR / "index.html")
 
+@app.get("/team.js", include_in_schema=False)
+def team_js():
+    return FileResponse(FRONTEND_DIR / "team.js")
+
+@app.get("/rating.js", include_in_schema=False)
+def rating_js():
+    return FileResponse(FRONTEND_DIR / "rating.js")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
