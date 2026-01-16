@@ -24,7 +24,9 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, KeepTogether, PageBreak
+from reportlab.platypus.flowables import Image
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 
 app = FastAPI(title="PeerEval Pro - Role Based Access")
 BASE_DIR = Path(__file__).resolve().parent          # .../backend
@@ -71,6 +73,14 @@ def team_js():
 @app.get("/rating.js", include_in_schema=False)
 def rating_js():
     return FileResponse(FRONTEND_DIR / "rating.js")
+
+@app.get("/results.html", include_in_schema=False)
+def results_page():
+    return FileResponse(FRONTEND_DIR / "results.html")
+
+@app.get("/all-results.html", include_in_schema=False)
+def all_results_page():
+    return FileResponse(FRONTEND_DIR / "all-results.html")
 
 app.add_middleware(
     CORSMiddleware,
@@ -790,61 +800,302 @@ def download_report_pdf(user=Depends(require_roles("student"))):
     
     # Generate PDF
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.75*inch, bottomMargin=0.75*inch)
+    doc = SimpleDocTemplate(
+        buffer, 
+        pagesize=letter, 
+        topMargin=0.5*inch, 
+        bottomMargin=0.5*inch,
+        leftMargin=0.75*inch,
+        rightMargin=0.75*inch
+    )
     styles = getSampleStyleSheet()
     
-    # Custom styles
-    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=22, spaceAfter=6, textColor=colors.HexColor('#1e293b'))
-    subtitle_style = ParagraphStyle('Subtitle', parent=styles['Normal'], fontSize=12, textColor=colors.HexColor('#64748b'), spaceAfter=20)
-    heading_style = ParagraphStyle('Heading', parent=styles['Heading2'], fontSize=14, spaceBefore=20, spaceAfter=10, textColor=colors.HexColor('#334155'))
+    # Professional color scheme
+    primary_color = colors.HexColor('#1e293b')
+    secondary_color = colors.HexColor('#475569')
+    accent_color = colors.HexColor('#6366f1')
+    success_color = colors.HexColor('#10b981')
+    warning_color = colors.HexColor('#f59e0b')
+    danger_color = colors.HexColor('#ef4444')
+    light_bg = colors.HexColor('#f8fafc')
+    border_color = colors.HexColor('#e2e8f0')
+    text_muted = colors.HexColor('#64748b')
+    
+    # Custom professional styles
+    header_style = ParagraphStyle(
+        'Header',
+        parent=styles['Heading1'],
+        fontSize=28,
+        textColor=primary_color,
+        spaceAfter=8,
+        fontName='Helvetica-Bold',
+        alignment=TA_LEFT
+    )
+    
+    subtitle_style = ParagraphStyle(
+        'Subtitle',
+        parent=styles['Normal'],
+        fontSize=11,
+        textColor=text_muted,
+        spaceAfter=4,
+        fontName='Helvetica'
+    )
+    
+    section_heading_style = ParagraphStyle(
+        'SectionHeading',
+        parent=styles['Heading2'],
+        fontSize=16,
+        textColor=primary_color,
+        spaceBefore=24,
+        spaceAfter=12,
+        fontName='Helvetica-Bold',
+        borderWidth=0,
+        borderPadding=0
+    )
+    
+    body_style = ParagraphStyle(
+        'Body',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=primary_color,
+        spaceAfter=8,
+        fontName='Helvetica',
+        leading=14
+    )
+    
+    score_large_style = ParagraphStyle(
+        'ScoreLarge',
+        parent=styles['Normal'],
+        fontSize=36,
+        textColor=primary_color,
+        spaceAfter=4,
+        fontName='Helvetica-Bold',
+        alignment=TA_CENTER
+    )
+    
+    footer_style = ParagraphStyle(
+        'Footer',
+        parent=styles['Normal'],
+        fontSize=8,
+        textColor=text_muted,
+        spaceAfter=0,
+        fontName='Helvetica',
+        alignment=TA_CENTER
+    )
     
     elements = []
     
-    # Title
-    elements.append(Paragraph("Peer Review Report", title_style))
-    elements.append(Paragraph(f"Generated for: <b>{student['username']}</b>", subtitle_style))
-    elements.append(Paragraph(f"Date: {datetime.now().strftime('%B %d, %Y at %H:%M')}", subtitle_style))
-    elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#e2e8f0'), spaceAfter=20))
+    # Professional Header with Branding
+    header_table_data = [
+        [
+            Paragraph(
+                f"<b><font size='20' color='{accent_color.hexval()}'>PeerEval</font> <font size='20' color='{primary_color.hexval()}'>Pro</font></b>",
+                ParagraphStyle('Brand', parent=styles['Normal'], fontSize=20, textColor=primary_color, fontName='Helvetica-Bold')
+            ),
+            Paragraph(
+                f"<font size='9' color='{text_muted.hexval()}'><b>PEER REVIEW REPORT</b></font><br/>"
+                f"<font size='8' color='{text_muted.hexval()}'>{datetime.now().strftime('%B %d, %Y')}</font>",
+                ParagraphStyle('HeaderRight', parent=styles['Normal'], fontSize=9, textColor=text_muted, alignment=TA_RIGHT, fontName='Helvetica')
+            )
+        ]
+    ]
+    header_table = Table(header_table_data, colWidths=[4*inch, 2.5*inch])
+    header_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+        ('TOPPADDING', (0, 0), (-1, -1), 0),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+    ]))
+    elements.append(header_table)
+    elements.append(Spacer(1, 0.3*inch))
+    elements.append(HRFlowable(width="100%", thickness=2, color=accent_color, spaceAfter=0.25*inch))
     
-    # Overall Score
-    elements.append(Paragraph("Overall Performance", heading_style))
-    score_color = colors.HexColor('#10b981') if overall_score >= 4 else (colors.HexColor('#f59e0b') if overall_score >= 3 else colors.HexColor('#ef4444'))
-    elements.append(Paragraph(f"<font size='28' color='{score_color.hexval()}'><b>{overall_score}</b></font> <font size='12' color='#64748b'>/ 5.0</font>", styles['Normal']))
-    elements.append(Paragraph(f"Based on {len(reviews)} ratings from {len(set(r['reviewer_id'] for r in reviews))} reviewers", subtitle_style))
-    elements.append(Spacer(1, 20))
+    # Student Information Section
+    student_info_data = [
+        [
+            Paragraph(
+                f"<b>Student Name:</b> {student['username']}",
+                body_style
+            ),
+            Paragraph(
+                f"<b>Email:</b> {student.get('email', 'N/A')}",
+                body_style
+            )
+        ],
+        [
+            Paragraph(
+                f"<b>Report Generated:</b> {datetime.now().strftime('%B %d, %Y at %I:%M %p')}",
+                body_style
+            ),
+            Paragraph(
+                f"<b>Total Reviewers:</b> {len(set(r['reviewer_id'] for r in reviews))}",
+                body_style
+            )
+        ]
+    ]
+    student_info_table = Table(student_info_data, colWidths=[3*inch, 3*inch])
+    student_info_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), light_bg),
+        ('TEXTCOLOR', (0, 0), (-1, -1), primary_color),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 10),
+        ('LEFTPADDING', (0, 0), (-1, -1), 12),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+        ('GRID', (0, 0), (-1, -1), 0, colors.white),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    elements.append(student_info_table)
+    elements.append(Spacer(1, 0.3*inch))
     
-    # Criterion Scores Table
+    # Overall Performance Score - Professional Card Style
+    score_color = success_color if overall_score >= 4 else (warning_color if overall_score >= 3 else danger_color)
+    score_percentage = (overall_score / 5.0) * 100
+    
+    score_card_data = [
+        [
+            Paragraph(
+                "<b>Overall Performance Score</b>",
+                ParagraphStyle('ScoreLabel', parent=styles['Normal'], fontSize=12, textColor=secondary_color, alignment=TA_CENTER, fontName='Helvetica-Bold', spaceAfter=8)
+            )
+        ],
+        [
+            Paragraph(
+                f"<font size='48' color='{score_color.hexval()}'><b>{overall_score:.2f}</b></font>",
+                ParagraphStyle('ScoreValue', parent=styles['Normal'], fontSize=48, textColor=score_color, alignment=TA_CENTER, fontName='Helvetica-Bold', spaceAfter=4)
+            )
+        ],
+        [
+            Paragraph(
+                f"<font size='11' color='{text_muted.hexval()}'>out of 5.0</font>",
+                ParagraphStyle('ScoreMax', parent=styles['Normal'], fontSize=11, textColor=text_muted, alignment=TA_CENTER, spaceAfter=12)
+            )
+        ],
+        [
+            Paragraph(
+                f"<font size='9' color='{text_muted.hexval()}'>Based on {len(reviews)} individual ratings from {len(set(r['reviewer_id'] for r in reviews))} peer reviewers</font>",
+                ParagraphStyle('ScoreSubtext', parent=styles['Normal'], fontSize=9, textColor=text_muted, alignment=TA_CENTER, spaceAfter=0)
+            )
+        ]
+    ]
+    score_card_table = Table(score_card_data, colWidths=[6.5*inch])
+    score_card_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.white),
+        ('TEXTCOLOR', (0, 0), (-1, -1), primary_color),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+        ('TOPPADDING', (0, 0), (-1, -1), 12),
+        ('LEFTPADDING', (0, 0), (-1, -1), 20),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 20),
+        ('GRID', (0, 0), (-1, -1), 1, border_color),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+    ]))
+    elements.append(score_card_table)
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Detailed Criterion Scores Table
     if criterion_results:
-        elements.append(Paragraph("Scores by Criterion", heading_style))
+        elements.append(Paragraph("Detailed Performance Breakdown", section_heading_style))
         
-        table_data = [["Criterion", "Weight", "Avg Score", "Reviews"]]
-        for cr in criterion_results:
-            table_data.append([cr["title"], f"{cr['weight']:.1f}", f"{cr['average']:.2f}", str(cr["count"])])
+        # Sort criteria by average score (highest first)
+        criterion_results_sorted = sorted(criterion_results, key=lambda x: x['average'], reverse=True)
         
-        table = Table(table_data, colWidths=[3*inch, 1*inch, 1*inch, 1*inch])
+        table_data = [["Evaluation Criterion", "Weight", "Average Score", "Ratings"]]
+        for cr in criterion_results_sorted:
+            # Determine color for score
+            cr_score = cr['average']
+            if cr_score >= 4:
+                score_display_color = success_color.hexval()
+            elif cr_score >= 3:
+                score_display_color = warning_color.hexval()
+            else:
+                score_display_color = danger_color.hexval()
+            
+            table_data.append([
+                Paragraph(f"<b>{cr['title']}</b>", body_style),
+                Paragraph(f"{cr['weight']:.1f}x", ParagraphStyle('TableText', parent=body_style, alignment=TA_CENTER)),
+                Paragraph(
+                    f"<font color='{score_display_color}'><b>{cr['average']:.2f}</b></font> / 5.0",
+                    ParagraphStyle('TableText', parent=body_style, alignment=TA_CENTER)
+                ),
+                Paragraph(str(cr['count']), ParagraphStyle('TableText', parent=body_style, alignment=TA_CENTER))
+            ])
+        
+        table = Table(table_data, colWidths=[3.5*inch, 0.8*inch, 1.2*inch, 1*inch])
         table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f1f5f9')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#334155')),
+            # Header row
+            ('BACKGROUND', (0, 0), (-1, 0), accent_color),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 11),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
             ('TOPPADDING', (0, 0), (-1, 0), 12),
+            ('LEFTPADDING', (0, 0), (-1, 0), 10),
+            ('RIGHTPADDING', (0, 0), (-1, 0), 10),
+            ('ALIGN', (0, 0), (-1, 0), 'LEFT'),
+            # Data rows
             ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-            ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor('#1e293b')),
+            ('TEXTCOLOR', (0, 1), (-1, -1), primary_color),
             ('FONTSIZE', (0, 1), (-1, -1), 10),
             ('BOTTOMPADDING', (0, 1), (-1, -1), 10),
             ('TOPPADDING', (0, 1), (-1, -1), 10),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
-            ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+            ('LEFTPADDING', (0, 1), (-1, -1), 10),
+            ('RIGHTPADDING', (0, 1), (-1, -1), 10),
+            # Alternating row colors
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, light_bg]),
+            # Grid
+            ('GRID', (0, 0), (-1, -1), 0.5, border_color),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ]))
         elements.append(table)
     else:
-        elements.append(Paragraph("No reviews received yet.", styles['Normal']))
+        elements.append(Paragraph("No reviews received yet.", body_style))
     
-    # Footer
-    elements.append(Spacer(1, 40))
-    elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#e2e8f0'), spaceAfter=10))
-    elements.append(Paragraph(f"<font size='9' color='#94a3b8'>PeerEval Pro - Confidential Report</font>", styles['Normal']))
+    # Summary Statistics
+    elements.append(Spacer(1, 0.3*inch))
+    elements.append(Paragraph("Summary Statistics", section_heading_style))
+    
+    stats_data = [
+        [
+            Paragraph("<b>Total Ratings</b>", body_style),
+            Paragraph(f"{len(reviews)}", ParagraphStyle('StatValue', parent=body_style, alignment=TA_CENTER, fontName='Helvetica-Bold')),
+            Paragraph("<b>Unique Reviewers</b>", body_style),
+            Paragraph(f"{len(set(r['reviewer_id'] for r in reviews))}", ParagraphStyle('StatValue', parent=body_style, alignment=TA_CENTER, fontName='Helvetica-Bold'))
+        ],
+        [
+            Paragraph("<b>Criteria Evaluated</b>", body_style),
+            Paragraph(f"{len(criterion_results)}", ParagraphStyle('StatValue', parent=body_style, alignment=TA_CENTER, fontName='Helvetica-Bold')),
+            Paragraph("<b>Performance Level</b>", body_style),
+            Paragraph(
+                f"{'Excellent' if overall_score >= 4 else ('Good' if overall_score >= 3 else 'Needs Improvement')}",
+                ParagraphStyle('StatValue', parent=body_style, alignment=TA_CENTER, fontName='Helvetica-Bold', textColor=score_color)
+            )
+        ]
+    ]
+    stats_table = Table(stats_data, colWidths=[2.5*inch, 1*inch, 2.5*inch, 1*inch])
+    stats_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), light_bg),
+        ('TEXTCOLOR', (0, 0), (-1, -1), primary_color),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 10),
+        ('LEFTPADDING', (0, 0), (-1, -1), 12),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+        ('GRID', (0, 0), (-1, -1), 0.5, border_color),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    elements.append(stats_table)
+    
+    # Professional Footer
+    elements.append(Spacer(1, 0.4*inch))
+    elements.append(HRFlowable(width="100%", thickness=1, color=border_color, spaceAfter=0.15*inch))
+    footer_text = (
+        f"<b>PeerEval Pro</b> - Confidential Peer Review Report | "
+        f"Generated on {datetime.now().strftime('%B %d, %Y at %I:%M %p')} | "
+        f"This document contains confidential evaluation data and is intended solely for the recipient."
+    )
+    elements.append(Paragraph(footer_text, footer_style))
     
     doc.build(elements)
     buffer.seek(0)
