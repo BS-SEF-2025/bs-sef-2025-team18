@@ -768,7 +768,7 @@ body::after {
 
 .signup-page .form-label-large,
 .signup-page .step-title-group label,
-.signup-page .review-form-body label {
+.signup-page .review-form-body label:not(.criterion-label) {
   color: #ffffff !important;
 }
 
@@ -896,8 +896,11 @@ body::after {
   color: #fca5a5;
 }
 
-.signup-page .criterion-label {
-  color: #e2e8f0;
+.signup-page .criterion-label,
+.signup-page .review-form-body .criterion-label,
+.signup-page .rating-container-enhanced .criterion-label,
+.signup-page .review-card .criterion-label {
+  color: #0F172A !important;
 }
 
 .signup-page .rating-container-enhanced {
@@ -1268,7 +1271,7 @@ button:not(.auth-button):disabled {
   display: block;
   font-weight: 600;
   font-size: 15px;
-  color: #334155;
+  color: #0F172A !important;
   margin-bottom: 12px;
 }
 
@@ -2222,7 +2225,7 @@ hr {
 .review-card .criterion-label {
   font-size: 16px;
   font-weight: 600;
-  color: #1e293b;
+  color: #0F172A !important;
   margin-bottom: 16px;
   display: flex;
   align-items: center;
