@@ -411,6 +411,8 @@
 
       const label = document.createElement("label");
       label.className = "criterion-label";
+      label.style.color = "#0F172A";
+      label.style.fontWeight = "600";
       // Use criterion.title (from backend) - ensure it's not hardcoded
       label.textContent = criterion.title || criterion.name || "Unnamed Criterion";
       if (criterion.required) {
