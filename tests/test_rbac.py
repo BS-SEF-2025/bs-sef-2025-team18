@@ -1,14 +1,6 @@
-import os
-import gc
-import time
-import shutil
 import sqlite3
-import tempfile
-import pytest
-from fastapi.testclient import TestClient
 
 import backend.db as db
-from backend.main import app
 
 
 # -------------------------
@@ -41,40 +33,6 @@ def auth_headers(token: str):
 def table_columns(conn: sqlite3.Connection, table: str) -> list[str]:
     conn.row_factory = sqlite3.Row
     return [r["name"] for r in conn.execute(f"PRAGMA table_info({table});")]
-
-
-# -------------------------
-# Fixture: isolated DB per test (Windows-safe cleanup)
-# -------------------------
-@pytest.fixture()
-def client():
-    """
-    Each test uses a fresh temporary DB so we never touch backend/app.db.
-    Windows: sqlite file can stay locked briefly -> we delete with retries.
-    """
-    old_db_path = db.DB_PATH
-
-    td = tempfile.mkdtemp()
-    db.DB_PATH = os.path.join(td, "test_app.db")
-    db.init_db()
-
-    try:
-        with TestClient(app) as c:
-            yield c
-    finally:
-        # restore DB_PATH first
-        db.DB_PATH = old_db_path
-
-        # force-release sqlite handles
-        gc.collect()
-
-        # retry delete (Windows file lock)
-        for _ in range(60):
-            try:
-                shutil.rmtree(td)
-                break
-            except PermissionError:
-                time.sleep(0.1)
 
 
 # ============================================================

@@ -1,9 +1,15 @@
+import os
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional, Dict, Any, Iterator
 
 DB_PATH = str(Path(__file__).with_name("app.db"))
+
+
+def get_db_path() -> str:
+    env_path = os.getenv("DATABASE_PATH") or os.getenv("DATABASE_URL")
+    return env_path if env_path else DB_PATH
 
 
 @contextmanager
@@ -13,7 +19,7 @@ def get_conn(path: Optional[str] = None) -> Iterator[sqlite3.Connection]:
     sqlite Connection context manager does NOT close the connection.
     This wrapper ensures every connection is ALWAYS closed.
     """
-    conn = sqlite3.connect(path or DB_PATH, check_same_thread=False)
+    conn = sqlite3.connect(path or get_db_path(), check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
     try:
@@ -129,34 +135,54 @@ def init_db() -> None:
             """
         )
 
-        # ✅ Review state table (tracks review lifecycle: round1, round2, published)
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS review_state (
-                id INTEGER PRIMARY KEY CHECK (id = 1),
-                status TEXT NOT NULL DEFAULT 'round1' CHECK (status IN ('round1', 'round2', 'published'))
-            );
-            """
-        )
+        # ✅ Review state table (tracks review lifecycle: draft, started, published)
+        def _needs_review_state_migration() -> bool:
+            row = conn.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='review_state'"
+            ).fetchone()
+            if not row or not row["sql"]:
+                return False
+            return "draft" not in row["sql"]
 
-        # Migration: Update review_state table structure if needed
-        # Drop and recreate to update CHECK constraint (SQLite doesn't support ALTER TABLE CHECK)
-        try:
+        def _map_review_state(value: Optional[str]) -> str:
+            if value in ("draft", "started", "published"):
+                return value
+            if value == "round1":
+                return "draft"
+            if value == "round2":
+                return "started"
+            return "draft"
+
+        if _needs_review_state_migration():
+            # Preserve current status if possible, then rebuild with new constraint.
+            current_status_row = conn.execute(
+                "SELECT status FROM review_state WHERE id = 1"
+            ).fetchone()
+            current_status = _map_review_state(current_status_row["status"]) if current_status_row else "draft"
+            conn.execute("DROP TABLE IF EXISTS review_state")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS review_state (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'started', 'published'))
+                );
+                """
+            )
+            conn.execute("INSERT OR REPLACE INTO review_state (id, status) VALUES (1, ?)", (current_status,))
+        else:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS review_state (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'started', 'published'))
+                );
+                """
+            )
+
+            # Initialize review_state if it doesn't exist
             existing_state = conn.execute("SELECT COUNT(*) AS c FROM review_state").fetchone()
-            if existing_state and int(existing_state["c"]) > 0:
-                # Migrate existing states: draft -> round1, started -> round1, published -> published
-                current_status = conn.execute("SELECT status FROM review_state WHERE id = 1").fetchone()
-                if current_status:
-                    old_status = current_status["status"]
-                    new_status = "round1" if old_status in ("draft", "started") else "published"
-                    conn.execute("UPDATE review_state SET status = ? WHERE id = 1", (new_status,))
-        except Exception:
-            pass
-        
-        # Initialize review_state if it doesn't exist
-        existing_state = conn.execute("SELECT COUNT(*) AS c FROM review_state").fetchone()
-        if existing_state and int(existing_state["c"]) == 0:
-            conn.execute("INSERT INTO review_state (id, status) VALUES (1, 'round1')")
+            if existing_state and int(existing_state["c"]) == 0:
+                conn.execute("INSERT INTO review_state (id, status) VALUES (1, 'draft')")
 
         # Migration: Add round column to peer_review_submissions if it doesn't exist
         if not _column_exists(conn, "peer_review_submissions", "round"):
@@ -282,14 +308,16 @@ def count_peer_review_criteria() -> int:
         return int(row["c"]) if row else 0
 
 
-def insert_peer_review_criteria(title: str, required: int, scale_min: int, scale_max: int) -> None:
+def insert_peer_review_criteria(
+    title: str, required: int, scale_min: int, scale_max: int, weight: float = 1.0
+) -> None:
     with get_conn() as conn:
         conn.execute(
             """
             INSERT INTO peer_review_criteria (title, required, scale_min, scale_max, weight)
-            VALUES (?, ?, ?, ?, 1.0)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            (title, required, scale_min, scale_max),
+            (title, required, scale_min, scale_max, weight),
         )
 
 
@@ -421,6 +449,12 @@ def publish_results(published_by: int) -> None:
             (published_by,),
         )
         # Commit is handled by the context manager
+
+
+def clear_results_publication() -> None:
+    """Clear any published results (re-open submissions/edits)."""
+    with get_conn() as conn:
+        conn.execute("DELETE FROM peer_review_results_published")
 
 
 def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
@@ -656,16 +690,25 @@ def delete_criterion(criterion_id: int) -> bool:
 # Review State Management
 # =========================
 def get_review_state() -> str:
-    """Get the current review state status. Returns 'round1' by default if not set."""
+    """Get the current review state status. Returns 'draft' by default if not set."""
     with get_conn() as conn:
         row = conn.execute("SELECT status FROM review_state WHERE id = 1").fetchone()
-        return row["status"] if row else "round1"
+        if not row:
+            return "draft"
+        status = row["status"]
+        if status == "round1":
+            return "draft"
+        if status == "round2":
+            return "started"
+        return status
 
 
 def set_review_state(status: str) -> None:
-    """Set the review state status. Must be 'round1', 'round2', or 'published'."""
-    if status not in ("round1", "round2", "published"):
-        raise ValueError(f"Invalid status: {status}. Must be 'round1', 'round2', or 'published'")
+    """Set the review state status. Must be 'draft', 'started', or 'published'."""
+    if status in ("round1", "round2"):
+        status = "draft" if status == "round1" else "started"
+    if status not in ("draft", "started", "published"):
+        raise ValueError(f"Invalid status: {status}. Must be 'draft', 'started', or 'published'")
     
     with get_conn() as conn:
         # Use INSERT OR REPLACE to ensure id=1 always exists
